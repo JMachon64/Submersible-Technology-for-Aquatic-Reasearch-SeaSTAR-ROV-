@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: my-package-name
+Version: 0.0.0
+Summary: TODO: Package description
+Maintainer: josem
+Maintainer-email: josem@todo.todo
+License: TODO: License declaration
+Provides-Extra: test

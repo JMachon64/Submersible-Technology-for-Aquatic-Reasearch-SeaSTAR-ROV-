@@ -1,0 +1,27 @@
+running develop
+running egg_info
+creating my_package_name.egg-info
+writing my_package_name.egg-info/PKG-INFO
+writing dependency_links to my_package_name.egg-info/dependency_links.txt
+writing entry points to my_package_name.egg-info/entry_points.txt
+writing requirements to my_package_name.egg-info/requires.txt
+writing top-level names to my_package_name.egg-info/top_level.txt
+writing manifest file 'my_package_name.egg-info/SOURCES.txt'
+reading manifest file 'my_package_name.egg-info/SOURCES.txt'
+writing manifest file 'my_package_name.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/python3.12/site-packages/my-package-name.egg-link (link to .)
+Installing camerafake script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+Installing controltest script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+Installing mission_bridge_node script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+Installing mission_fsm_node script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+Installing seastar_heartbeat_node script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+Installing uart_bridge_node script to /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/lib/my_package_name
+
+Installed /home/josem/SeaSTAR/src/my_package_name/build/my_package_name
+running symlink_data
+creating /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/share/ament_index
+creating /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/share/ament_index/resource_index
+creating /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/share/ament_index/resource_index/packages
+symbolically linking /home/josem/SeaSTAR/src/my_package_name/build/my_package_name/resource/my_package_name -> /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/share/ament_index/resource_index/packages
+symbolically linking /home/josem/SeaSTAR/src/my_package_name/build/my_package_name/package.xml -> /home/josem/SeaSTAR/src/my_package_name/install/my_package_name/share/my_package_name

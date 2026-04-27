@@ -1,0 +1,8 @@
+[console_scripts]
+camerafake = my_package_name.camerafake:main
+controltest = my_package_name.controltest:main
+gamecontroller = my_package_name.gamecontroller:main
+mission_bridge_node = my_package_name.mission_bridge_node:main
+mission_fsm_node = my_package_name.mission_fsm_node:main
+seastar_heartbeat_node = my_package_name.seastar_heartbeat_node:main
+uart_bridge_node = my_package_name.uart_bridge_node:main

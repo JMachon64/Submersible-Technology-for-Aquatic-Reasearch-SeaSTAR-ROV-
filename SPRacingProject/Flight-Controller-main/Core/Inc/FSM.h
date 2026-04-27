@@ -1,0 +1,45 @@
+/* 
+ * File:   FSM.h
+ * Author: Jose Machon
+ *
+ * Created on April 1, 2026, 9:24 AM
+ */
+
+#ifndef FSM_H
+#define FSM_H
+
+#include <stdint.h>
+
+typedef enum {
+    BOOT_MODE = 0,
+    MISSION_MODE_IDLE,
+    MISSION_MODE_ACTIVE,
+    FAILURE_MODE
+} SeaSTAR_FSM_t;
+
+typedef enum {
+    FSM_EVENT_NONE = 0,
+    FSM_EVENT_BOOT_DONE,
+
+    FSM_EVENT_START_MISSION,
+    FSM_EVENT_END_MISSION,
+
+    FSM_CONTROLLER_DISCONNETION_DETECTED,
+    FSM_CONTROLLER_RECONNECTION_DETECTED,
+
+    FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE,
+    FSM_EVENT_COMMUNICATION_RECONNECTION_SUCCESS,
+
+    FSM_EVENT_COLLECT_WATER_SAMPLE,
+
+    FSM_EVENT_LEAK_DETECTED
+
+} SeaSTAR_FSM_Event_t;
+
+void FSM_PostEvent(SeaSTAR_FSM_Event_t event);
+
+uint8_t SeaSTAR_FSM(void);
+
+SeaSTAR_FSM_t FSM_GetState(void);
+
+#endif

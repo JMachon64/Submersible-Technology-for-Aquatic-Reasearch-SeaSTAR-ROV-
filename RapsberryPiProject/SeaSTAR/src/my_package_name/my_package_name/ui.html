@@ -1,0 +1,1424 @@
+<!doctype html> 
+<html lang="en">
+<head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width,initial-scale=1" />
+ <title>SeaStar ROV — Control Interface</title>
+
+ <style>
+ :root{
+ --bg0:#05070b; /*black*/
+ --bg1:#070b12; 
+ --panel:#0c111a;
+ --stroke:rgba(255,255,255,.10);
+ --stroke2:rgba(255,255,255,.16);
+ --text:#e8eef7;
+ --muted:rgba(232,238,247,.62);
+
+ --lightblue:#19d3e6; /* the "--teal" is a way to name the color codes so we can just put teal instead of having to do color code all the time.*/
+ --green:#1ee38a; /* did this to all the colors.*/
+ --blue:#2aa7ff;
+ --orange:#ff9f1c;
+ --purple:#b077ff;
+ --red:#ff4d5f;
+
+ --r:18px;
+
+ --shadow-blue:
+ 0 14px 45px rgba(42,167,255,.20),
+ 0 0 40px rgba(42,167,255,.12);
+
+ --shadow-soft:
+ 0 10px 30px rgba(0,0,0,.35);
+
+ --ring: 0 0 0 1px rgba(0,0,0,.30) inset;
+ --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+ }
+
+ *{box-sizing:border-box}
+ html,body{height:100%}
+ body{
+ margin:0;
+ font-family: var(--font);
+ color:var(--text);
+ background: linear-gradient(180deg, var(--bg0), var(--bg1));
+ font-size:16px;
+ }
+
+ .login{ /*login screen, it covers the entire window*/
+ position:fixed; inset:0; /*goes on top of everything so user cannot access UI, fills 100% of the screen.*/
+ display:flex; align-items:center; justify-content:center; /*centers vertically and horizontally*/
+ z-index:9999; /*makes it sit on top of every other elemenet*/
+ background:
+ radial-gradient(1000px 700px at 50% 20%, rgba(25,211,230,.10), transparent 60%),
+ radial-gradient(900px 600px at 80% 30%, rgba(42,167,255,.10), transparent 60%),
+ linear-gradient(180deg, var(--bg0), var(--bg1));
+ }
+ .login-card{ /*this is the login card in the center of the screen.*/
+ width:min(460px, 92vw);
+ padding:22px;
+ border-radius:20px; /*for rounded corners*/
+ border:1px solid rgba(255,255,255,.12);
+ background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03)); /*faint white border*/
+ box-shadow: var(--shadow-blue);
+ }
+ .login-top{display:flex; align-items:center; gap:12px; margin-bottom:10px;}
+ .login-logo{
+ width:44px; height:44px;
+ border-radius:50%;
+ object-fit:cover;
+ border:1px solid rgba(255,255,255,.12);
+ background: rgba(0,0,0,.18);
+ filter: drop-shadow(0 0 18px rgba(25,211,230,.25));
+ }
+ .login-card h2{margin:0; font-size:22px; font-weight:850;}
+ .login-card p{margin:6px 0 14px; color:var(--muted); font-size:14px; line-height:1.45;}
+ .login-card input{
+ width:100%;
+ padding:13px 12px;
+ border-radius:12px;
+ border:1px solid rgba(255,255,255,.16);
+ background: rgba(0,0,0,.25);
+ color: var(--text);
+ outline:none;
+ margin-bottom:10px;
+ font-size: 15px;
+ }
+ .login-card button{
+ width:100%;
+ padding:12px 12px;
+ border-radius:12px;
+ border:1px solid rgba(30,227,138,.25);
+ background: rgba(30,227,138,.10);
+ color: rgba(232,238,247,.92);
+ font-weight:850;
+ cursor:pointer;
+ font-size: 15px;
+ }
+ .login-msg{
+ margin-top:10px;
+ font-size:14px;
+ min-height:18px;
+ color: rgba(255,77,95,.92);
+ }
+ .tiny{margin-top:10px; font-size:12px; color:rgba(232,238,247,.45);}
+ .tiny code{
+ color:rgba(232,238,247,.70);
+ background:rgba(255,255,255,.06);
+ padding:2px 6px;
+ border-radius:8px;
+ border:1px solid rgba(255,255,255,.08);
+ }
+
+ .wrap{max-width:1400px; margin:0 auto; padding:18px 18px 28px;}
+ .app-shell{
+ border:1px solid rgba(255,255,255,.10);
+ border-radius:22px;
+ background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+ box-shadow: var(--shadow-blue);
+ padding:14px;
+ }
+
+ .brand{
+ display:flex;
+ align-items:center;
+ gap:14px;
+ }
+
+ .logo{
+ width:52px;
+ height:52px;
+ border-radius:50%;
+ object-fit:cover;
+ border:1px solid rgba(255,255,255,.12);
+ background: rgba(0,0,0,.18);
+ filter: drop-shadow(0 0 18px rgba(25,211,230,.25));
+ margin-top:0;
+ flex-shrink:0;
+ display:block;
+ }
+
+ .titleblock{
+ display:flex;
+ flex-direction:column;
+ justify-content:center;
+ }
+
+ .titleblock h1{
+ margin:0;
+ font-size:24px;
+ letter-spacing:.2px;
+ font-weight:800;
+ line-height:1.1;
+ }
+
+ .titleblock p{
+ margin:6px 0 0;
+ color:var(--muted);
+ font-size:14px;
+ line-height:1.3;
+ }
+
+ .topbar{
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:16px;
+ padding:10px 2px 14px;
+ border-bottom:1px solid rgba(255,255,255,.10);
+ }
+
+ .pill{
+ display:inline-flex; align-items:center; gap:10px;
+ padding:10px 14px;
+ border-radius:12px;
+ border:1px solid rgba(255,255,255,.16);
+ background:rgba(255,255,255,.06);
+ box-shadow: var(--ring);
+ user-select:none;
+ white-space:nowrap;
+ cursor:default;
+ font-size:14px;
+ }
+ .wifi{width:18px; height:18px; color:rgba(232,238,247,.65);}
+ .pill span{font-weight:750; color:rgba(232,238,247,.78)}
+
+ .state-display{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ padding:10px 14px;
+ border-radius:12px;
+ border:1px solid rgba(255,255,255,.16);
+ background:rgba(255,255,255,.06);
+ box-shadow: var(--ring);
+ font-size:14px;
+ font-weight:850;
+ white-space:nowrap;
+ user-select:none;
+ cursor:default;
+ }
+ .state-boot{ /*state colors, js swaps these classes on or off. BOOT IS RED!*/
+ border-color: rgba(255,77,95,.30);
+ background: rgba(255,77,95,.10);
+ color: rgba(255,77,95,.95);
+ }
+ .state-idle{ /*IDLE IS ORANGE/YELLOWISH!*/
+ border-color: rgba(255,159,28,.30);
+ background: rgba(255,159,28,.10);
+ color: rgba(255,190,92,.96);
+ }
+ .state-mission{ /*MISSION MODE IS GREEN!*/
+ border-color: rgba(30,227,138,.30);
+ background: rgba(30,227,138,.10);
+ color: rgba(30,227,138,.96);
+ }
+.state-failure{ 
+ border-color: rgba(255,77,95,.30);
+ background: rgba(255,77,95,.10);
+ color: rgba(255,77,95,.95);
+ }
+
+ .mission-btn{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ padding:10px 14px;
+ border-radius:12px;
+ border:1px solid rgba(255,255,255,.16);
+ box-shadow: var(--ring);
+ font-size:14px;
+ font-weight:850;
+ white-space:nowrap;
+ cursor:pointer;
+ transition: background .2s ease, border-color .2s ease, transform .2s ease, opacity .2s ease;
+ }
+ .mission-btn:hover{
+ transform: translateY(-1px);
+ }
+ .mission-btn:disabled{
+ opacity:.55;
+ cursor:not-allowed;
+ transform:none;
+ }
+ .water-btn{
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ padding:10px 14px;
+ border-radius:12px;
+ border:1px solid rgba(42,167,255,.30);
+ background: rgba(42,167,255,.10);
+ color: rgba(42,167,255,.96);
+ box-shadow: var(--ring);
+ font-size:14px;
+ font-weight:850;
+ white-space:nowrap;
+ cursor:pointer;
+ transition: background .2s ease, border-color .2s ease, transform .2s ease, opacity .2s ease;
+ }
+ .water-btn:hover{
+ transform: translateY(-1px);
+ }
+ .water-btn:disabled{
+ opacity:.55;
+ cursor:not-allowed;
+ transform:none;
+ }
+ .mission-start{
+ border-color: rgba(30,227,138,.30);
+ background: rgba(30,227,138,.10);
+ color: rgba(30,227,138,.96);
+ }
+ .mission-end{
+ border-color: rgba(255,77,95,.30);
+ background: rgba(255,77,95,.10);
+ color: rgba(255,77,95,.96);
+ }
+
+ .grid{
+ margin-top:16px;
+ display:grid;
+ grid-template-columns: 420px 1fr;
+ gap:18px;
+ align-items:start;
+ }
+
+ .controls-panel{
+ padding:16px;
+ }
+
+ .controls-panel h2{
+ margin:0 0 12px;
+ font-size:14px;
+ letter-spacing:.12em;
+ text-transform:uppercase;
+ color:rgba(232,238,247,.55);
+ font-weight:800;
+ }
+
+ .controls-grid{
+ display:grid;
+ grid-template-columns: 1fr 1fr;
+ gap:12px;
+ }
+
+ .controls-grid .mission-btn,
+ .controls-grid .water-btn{
+ width:100%;
+ min-height:56px;
+ }
+
+ @media (max-width:520px){
+ .controls-grid{
+  grid-template-columns:1fr;
+ }
+ }
+ .panel{
+ background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+ border:1px solid rgba(255,255,255,.12);
+ border-radius:20px;
+ box-shadow: var(--shadow-blue);
+ }
+
+ .left{
+ display:flex;
+ flex-direction:column;
+ gap:14px;
+ }
+
+ .bubbles{padding:16px;}
+ .bubbles h2{
+ margin:0 0 12px;
+ font-size:14px;
+ letter-spacing:.12em;
+ text-transform:uppercase;
+ color:rgba(232,238,247,.55);
+ font-weight:800;
+ }
+ .bubble-grid{
+ display:grid;
+ grid-template-columns: 1fr 1fr;
+ gap:12px;
+ }
+ .bubble{
+ border-radius:999px;
+ border:1px solid rgba(255,255,255,.12);
+ background: rgba(0,0,0,.22);
+ box-shadow: var(--ring);
+ padding:12px 14px;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ min-height:64px;
+ }
+ .bubble .meta{
+ display:flex;
+ align-items:center;
+ gap:10px;
+ min-width:0;
+ }
+ .bubble .tag{
+ font-size:12px;
+ letter-spacing:.12em;
+ text-transform:uppercase;
+ color: rgba(232,238,247,.55);
+ font-weight:800;
+ white-space:nowrap;
+ }
+ .bubble .num{
+ font-size:22px;
+ font-weight:900;
+ letter-spacing:.2px;
+ line-height:1;
+ white-space:nowrap;
+ }
+ .bubble .unit{
+ font-size:13px;
+ color: rgba(232,238,247,.55);
+ font-weight:750;
+ margin-left:6px;
+ white-space:nowrap;
+ }
+ .dotIcon{
+ width:12px;height:12px;border-radius:50%;
+ box-shadow: 0 0 14px rgba(255,255,255,.10);
+ flex:0 0 auto;
+ }
+ .c-blue{background: rgba(42,167,255,.85)}
+ .c-orange{background: rgba(255,204,57,.90)}
+ .c-purple{background: rgba(176,119,255,.90)}
+ .c-green{background: rgba(30,227,138,.90)}
+
+ .card{
+ padding:16px;
+ border-radius:20px;
+ border:1px solid rgba(255,255,255,.12);
+ background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+ box-shadow: var(--shadow-blue);
+ }
+ .label{
+ display:flex; align-items:center; gap:10px;
+ color:rgba(232,238,247,.55);
+ font-size:12px;
+ letter-spacing:.14em;
+ text-transform:uppercase;
+ margin-bottom:10px;
+ font-weight:850;
+ }
+ .ico{width:18px;height:18px; opacity:.92}
+ .green{color:var(--green)}
+
+ pre.log{
+ margin:0;
+ white-space: pre-wrap;
+ font-size:13px;
+ color: rgba(232,238,247,.88);
+ background: rgba(0,0,0,.25);
+ border:1px solid rgba(255,255,255,.10);
+ border-radius:14px;
+ padding:12px;
+ max-height:140px;
+ overflow-y:auto;
+ line-height:1.35;
+ }
+
+ .bottom{padding:16px; border-radius:20px;}
+ .bottom h2{
+ margin:0 0 12px;
+ font-size:14px;
+ letter-spacing:.12em;
+ text-transform:uppercase;
+ color:rgba(232,238,247,.55);
+ font-weight:800;
+ }
+ .power-grid{
+ display:grid;
+ grid-template-columns: 1fr 1fr;
+ gap:12px;
+ }
+ .mini{
+ padding:12px 14px;
+ border-radius:999px;
+ border:1px solid rgba(255,255,255,.12);
+ background: rgba(0,0,0,.18);
+ box-shadow: var(--ring);
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:12px;
+ min-height:60px;
+ }
+ .mini .k{
+ color:rgba(232,238,247,.55);
+ letter-spacing:.12em;
+ text-transform:uppercase;
+ font-size:12px;
+ font-weight:850;
+ white-space:nowrap;
+ }
+ .mini .v{
+ font-size:22px;
+ font-weight:900;
+ line-height:1;
+ white-space:nowrap;
+ }
+ .mini .u{
+ color:rgba(232,238,247,.55);
+ font-weight:750;
+ font-size:13px;
+ margin-left:6px;
+ }
+ .lightblueText{color:var(--lightblue)}
+ .orangeText{color:var(--orange)}
+
+ .video{
+ position:relative;
+ overflow:hidden;
+ min-height:720px;
+ border-radius:20px;
+ }
+ .video::before{
+ content:"";
+ position:absolute; inset:0;
+ background:
+ radial-gradient(900px 520px at 20% 0%, rgba(42,167,255,.12), transparent 60%),
+ radial-gradient(900px 520px at 80% 0%, rgba(25,211,230,.10), transparent 55%),
+ linear-gradient(180deg, rgba(8,12,20,.92), rgba(7,10,16,.96));
+ }
+ .video-inner{position:relative; padding:16px; height:100%;}
+ .video-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+ .live{
+ display:inline-flex; align-items:center; gap:10px;
+ padding:9px 12px;
+ border-radius:999px;
+ border:1px solid rgba(255,255,255,.14);
+ background:rgba(0,0,0,.25);
+ font-size:14px;
+ color:rgba(232,238,247,.88);
+ box-shadow: var(--ring);
+ }
+ .dot{
+ width:9px;height:9px;border-radius:50%;
+ background:var(--red);
+ box-shadow:0 0 14px rgba(255,77,95,.35);
+ }
+ .cam-pill{
+ padding:9px 12px;
+ border-radius:999px;
+ border:1px solid rgba(255,255,255,.14);
+ background:rgba(0,0,0,.30);
+ font-weight:800;
+ font-size:13px;
+ color:rgba(232,238,247,.85);
+ box-shadow: var(--ring);
+ }
+ .video-frame{
+ margin-top:10px;
+ height:600px;
+ border-radius:20px;
+ border:1px solid rgba(255,255,255,.12);
+ background:
+ radial-gradient(900px 560px at 40% 30%, rgba(255,255,255,.06), transparent 62%),
+ linear-gradient(180deg, rgba(0,0,0,.20), rgba(0,0,0,.30));
+ display:flex; align-items:center; justify-content:center;
+ position:relative;
+ overflow:hidden;
+ }
+ .video-frame::after{
+ content:"";
+ position:absolute; inset:0;
+ background: radial-gradient(800px 420px at 50% 10%, rgba(42,167,255,.08), transparent 70%);
+ pointer-events:none;
+ }
+ .telemetry-strip{
+ position:absolute;
+ left:0; right:0; bottom:0;
+ padding:10px 14px;
+ display:flex;
+ justify-content:space-between;
+ gap:12px;
+ color:rgba(232,238,247,.70);
+ font-size:14px;
+ border-top:1px solid rgba(255,255,255,.10);
+ background: linear-gradient(180deg, transparent, rgba(0,0,0,.28));
+ }
+
+ @media (max-width:1080px){
+ .grid{grid-template-columns:1fr;}
+ .video{min-height:640px;}
+ .video-frame{height:520px;}
+ }
+ @media (max-width:520px){
+ .bubble-grid{grid-template-columns:1fr;}
+ .power-grid{grid-template-columns:1fr;}
+ }
+ 
+ .video-frame.recording{
+ border:2px solid rgba(255,77,95,.95);
+ box-shadow:
+ 0 0 0 1px rgba(255,77,95,.30) inset,
+ 0 0 18px rgba(255,77,95,.30),
+ 0 0 40px rgba(255,77,95,.18);
+}
+
+ .rec-badge{
+ display:inline-flex;
+ align-items:center;
+ gap:8px;
+ padding:8px 12px;
+ border-radius:999px;
+ border:1px solid rgba(255,77,95,.35);
+ background: rgba(255,77,95,.12);
+ color: rgba(255,77,95,.96);
+ font-size:13px;
+ font-weight:850;
+ letter-spacing:.04em;
+ box-shadow: var(--ring);
+ }
+
+ .rec-dot{
+ width:9px;
+ height:9px;
+ border-radius:50%;
+ background: var(--red);
+ box-shadow: 0 0 12px rgba(255,77,95,.45);
+ display:inline-block;
+ }
+
+ #recTimer{
+ color: rgba(232,238,247,.90);
+ font-weight:800;
+ margin-left:2px;
+ min-width:44px;
+ text-align:left;
+ }
+ .panel:hover,
+ .card:hover{
+ box-shadow:
+ 0 18px 60px rgba(42,167,255,.28),
+ 0 0 55px rgba(42,167,255,.20);
+ transition: box-shadow .25s ease;
+ }
+ 
+</style>
+</head>
+
+<body> 
+ <div class="login" id="loginScreen">
+  <div class="login-card">
+   <div class="login-top">
+    <img class="login-logo" src="seastar-logo.png" alt="SeaStar logo">
+    <div>
+     <h2>SeaStar Login</h2>
+     <p>Enter the access code to open the ROV dashboard.</p>
+    </div>
+   </div>
+
+   <input id="loginCode" type="password" placeholder="Access code" autocomplete="off" />
+   <button id="loginBtn">Login</button>
+   <div class="login-msg" id="loginMsg"></div>
+
+   <div class="tiny">
+    Local-only: connects to <code>ws://localhost:9090</code> after login.
+   </div>
+  </div>
+ </div>
+
+ <div class="wrap" id="app" style="display:none;">
+  <div class="app-shell">
+
+   <div class="topbar">
+    <div class="brand">
+     <img class="logo" src="seastar-logo.png" alt="SeaStar logo">
+     <div class="titleblock">
+      <h1>ROV Control Interface</h1>
+      <p>SeaSTAR (Submersible Technology for Aquatic Research)</p>
+     </div>
+    </div>
+
+    <div class="topbar-right">
+     <div class="state-display state-boot" id="stateDisplay">Current State: BOOT</div>
+
+     <div class="pill" id="connPill">
+      <svg class="wifi" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+       <path d="M2 8.5C7.5 3.6 16.5 3.6 22 8.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+       <path d="M5 12c4-3.4 10-3.4 14 0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+       <path d="M8.5 15.5c2.2-1.8 4.8-1.8 7 0" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+       <circle cx="12" cy="19" r="1.7" fill="currentColor"/>
+      </svg>
+      <span id="connText">Disconnected</span>
+     </div>
+    </div>
+   </div>
+
+   <div class="grid">
+
+    <div class="left">
+     <section class="panel controls-panel">
+      <h2>Mission Controls</h2>
+      <div class="controls-grid">
+       <button class="mission-btn mission-start" id="missionBtn">Start Mission</button>
+       <button class="water-btn" id="waterSampleBtn">Collect Water Sample</button>
+      </div>
+     </section>
+
+     <section class="panel bubbles">
+      <h2>Sensor Readings</h2>
+      <div class="bubble-grid">
+       <div class="bubble">
+        <div class="meta">
+         <span class="dotIcon c-blue"></span>
+         <span class="tag">Depth</span>
+        </div>
+        <div>
+         <span class="num" id="depthBig">—</span><span class="unit">m</span>
+        </div>
+       </div>
+
+       <div class="bubble">
+        <div class="meta">
+         <span class="dotIcon c-orange"></span>
+         <span class="tag">Temp</span>
+        </div>
+        <div>
+         <span class="num" id="tempBig">—</span><span class="unit">°C</span>
+        </div>
+       </div>
+
+       <div class="bubble">
+        <div class="meta">
+         <span class="dotIcon c-purple"></span>
+         <span class="tag">Pressure</span>
+        </div>
+        <div>
+         <span class="num" id="pressBig">—</span><span class="unit">bar</span>
+        </div>
+       </div>
+
+       <div class="bubble">
+        <div class="meta">
+         <span class="dotIcon c-green"></span>
+         <span class="tag">Heading</span>
+        </div>
+        <div>
+         <span class="num" id="headingBig">—</span><span class="unit">°</span>
+        </div>
+       </div>
+      </div>
+     </section>
+
+     <div class="card">
+      <div class="label">
+       <svg class="ico green" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6 9h12M6 15h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="8" cy="12" r="1.4" fill="currentColor"/>
+        <circle cx="16" cy="12" r="1.4" fill="currentColor"/>
+       </svg>
+       CONTROLLER EVENTS
+      </div>
+      <pre id="controllerLog" class="log">Waiting for controller input…</pre>
+     </div>
+
+     <section class="panel bottom">
+      <h2>Power Monitoring</h2>
+      <div class="power-grid">
+       <div class="mini">
+        <div class="k">Voltage</div>
+        <div><span class="v lightbluetext" id="voltBig">—</span><span class="u">V</span></div>
+       </div>
+       <div class="mini">
+        <div class="k">Current</div>
+        <div><span class="v orangeText" id="currBig">—</span><span class="u">A</span></div>
+       </div>
+      </div>
+     </section>
+    </div>
+
+    <section class="panel video">
+     <div class="video-inner">
+      <div class="video-top">
+       <div style="display:flex; align-items:center; gap:10px;">
+        <div class="live"><span class="dot"></span>LIVE</div>
+        <div class="rec-badge" id="recBadge" style="display:none;">
+         <span class="rec-dot"></span>
+         REC
+         <span id="recTimer">00:00</span>
+        </div>
+       </div>
+
+       <div class="cam-pill">CAM–1</div>
+      </div>
+
+      <div class="video-frame" id="videoFrame">
+       <iframe
+        id="camFrame"
+        src="http://192.168.2.2:8090/NavigationCamera"
+        title="Camera feed"
+        style="width:100%;height:100%;border:0;border-radius:18px;background:transparent;"
+        allow="autoplay; fullscreen"
+       ></iframe>
+
+       <div class="telemetry-strip">
+        <div>Depth: <span id="depthSmall">—</span>m</div>
+        <div>Heading: <span id="headingSmall">—</span>°</div>
+        <div>Temp: <span id="tempSmall">—</span>°C</div>
+        <div>Video: <span id="videoStatus">Idle</span></div>
+       </div>
+      </div> 
+     </div>
+    </section>
+
+   </div>
+  </div>
+ </div>
+
+ <script src="https://cdn.jsdelivr.net/npm/roslib/build/roslib.min.js"></script> 
+
+ <script>
+
+ //JAVA SCRIPT
+
+ //ROS Subscribers & Publishers
+ //mission control -> (/mission/control/) type: string
+ //purpose: sends mission commands such as start_mission, end_mission.
+
+ //mission state -> (/SeaSTAR/state/) type: string
+ //purpose: sends current state back to the UI
+
+ //sensors -> (/sensors/depth) type: float
+ //purpose: displays sensor data onto the UI
+
+ //controller events -> (/ui/controller_events) String
+ //purpose: sends controller events.
+
+ //(/uart/packet_tx_request) this is where button clicks will publish to.
+
+ const ACCESS_CODE = "seastar2026"; //password to enter the UI from the login page.
+
+ let currentState = "BOOT"; //we always start at boot (dk said no states though so idk :C)
+ let ros = null; //disconnected at first.
+ let missionControlTopic = null; //mission control topic is a ros topic that allows to send commands to the ROV.
+ let missionStateSub = null; //used to receive state updates from the ROV.
+
+ let cmdVelTopic = null; //publishes movement commands from browser controller input. (dont know if i need this ask alex)
+ let uiControllerTopic = null; //publishes controller event logs from browser.
+ let gamepadLoopStarted = false; //makes sure we only start the controller polling loop once.
+
+ let missionActive = false; //mission active starts at false (state of "mission active")
+ let telemetryActive = false; //telemetry is not active.
+ let videoActive = false; //video not active.
+ let waterSampleSent = false; //water sample not active.
+
+ let prevButtons = []; //stores previous gamepad button states for edge detection.
+ let prevMissionCombo = false; //stores previous state of joystick combo, so did the user already press it or no.
+ let prevTelemetryCombo = false; //stores previous state of bumper combo, so did the user already press this as well or no.
+
+ let recordingStartTime = null;
+ let recordingTimerInterval = null;
+
+ let thrusterCommandTopic = null;
+
+ const loginScreen = document.getElementById("loginScreen"); 
+ const app = document.getElementById("app");
+ const loginCode = document.getElementById("loginCode");
+ const loginBtn = document.getElementById("loginBtn");
+ const loginMsg = document.getElementById("loginMsg");
+
+ function setText(id, value){ //finds html element by its id and updates displayed text.
+ const el = document.getElementById(id);
+ if (el) el.textContent = value;
+ }
+
+ function appendLog(text){ //adds a new line of text to the controller log box.
+ const el = document.getElementById("controllerLog");
+ if (!el) return;
+ el.textContent += "\n" + text; //adds the new line lol.
+ el.scrollTop = el.scrollHeight; //autoscrolls so the user can always see the most recent message. 
+ }
+
+ function updateStateDisplay(){ //updates color and text of the state display (this is done by swapping css classes.).
+ const stateDisplay = document.getElementById("stateDisplay"); 
+ if (!stateDisplay) return;
+
+ stateDisplay.textContent = "Current State: " + currentState;
+ stateDisplay.classList.remove("state-boot", "state-idle", "state-mission", "state-failure"); //removes all color classes, then adds the right one below w/ conditional statements.
+
+ if (currentState === "BOOT"){
+ stateDisplay.classList.add("state-boot");
+ } else if (currentState === "IDLE"){
+ stateDisplay.classList.add("state-idle");
+ } else if (currentState === "MISSION MODE"){
+ stateDisplay.classList.add("state-mission");
+ } else if (currentState === "Failure"){
+ stateDisplay.classList.add("state-failure")
+ }
+ }
+
+ function updateMissionButton(){
+ const missionBtn = document.getElementById("missionBtn");
+ if (!missionBtn) return;
+
+ missionBtn.classList.remove("mission-start", "mission-end");
+
+ if (missionActive){
+  missionBtn.textContent = "End Mission";
+  missionBtn.classList.add("mission-end");
+ } 
+ else {
+  missionBtn.textContent = "Start Mission";
+  missionBtn.classList.add("mission-start");
+ }
+ }
+
+ function formatRecordingTime(totalSeconds){
+ const mins = Math.floor(totalSeconds / 60);
+ const secs = totalSeconds % 60;
+ return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+ }
+
+ function startRecordingUI(){
+ const videoFrame = document.getElementById("videoFrame");
+ const recBadge = document.getElementById("recBadge");
+ const recTimer = document.getElementById("recTimer");
+ videoActive = true;
+ setText("videoStatus", "Recording");
+
+ if (videoFrame) videoFrame.classList.add("recording");
+ if (recBadge) recBadge.style.display = "inline-flex";
+
+ recordingStartTime = Date.now();
+
+ if (recTimer) recTimer.textContent = "00:00";
+
+ if (recordingTimerInterval){
+  clearInterval(recordingTimerInterval);
+ }
+
+ recordingTimerInterval = setInterval(() => {
+  if (!recordingStartTime || !recTimer) return;
+
+  const elapsedSeconds = Math.floor((Date.now() - recordingStartTime) / 1000);
+  recTimer.textContent = formatRecordingTime(elapsedSeconds);
+ }, 1000);
+ }
+
+ function stopRecordingUI(){
+ const videoFrame = document.getElementById("videoFrame");
+ const recBadge = document.getElementById("recBadge");
+ const recTimer = document.getElementById("recTimer");
+
+ videoActive = false;
+ setText("videoStatus", "Not Recording");
+ if (videoFrame) videoFrame.classList.remove("recording");
+ if (recBadge) recBadge.style.display = "none";
+ if (recTimer) recTimer.textContent = "00:00";
+
+ if (recordingTimerInterval){
+  clearInterval(recordingTimerInterval);
+  recordingTimerInterval = null;
+ }
+
+ recordingStartTime = null;
+ }
+
+ function setConnectedUI(ok){
+ const connText = document.getElementById("connText");
+ const connPill = document.getElementById("connPill");
+ const missionBtn = document.getElementById("missionBtn");
+ const waterSampleBtn = document.getElementById("waterSampleBtn");
+
+ if (!connText || !connPill) return;
+
+ if (ok){
+  connPill.style.borderColor = "rgba(30,227,138,.22)";
+  connPill.style.background = "rgba(30,227,138,.08)";
+  connText.textContent = "Connected";
+  connText.style.color = "rgba(30,227,138,.92)";
+  if (missionBtn) missionBtn.disabled = false;
+  if (waterSampleBtn) waterSampleBtn.disabled = false;
+ } 
+ else {
+  connPill.style.borderColor = "rgba(255,77,95,.22)";
+  connPill.style.background = "rgba(255,77,95,.08)";
+  connText.textContent = "Disconnected";
+  connText.style.color = "rgba(255,77,95,.92)";
+  if (missionBtn) missionBtn.disabled = true;
+  if (waterSampleBtn) waterSampleBtn.disabled = true;
+ }
+ }
+ //translating joses python controller logic to js.
+ function getTriggerThrust(gp){ //game pad has all the controller values.
+ const ZL_AXIS = 4; //array value he had.
+ const ZR_AXIS = 5; //same here.
+ const zlRaw = gp.axes[ZL_AXIS] ?? -1; //??-1 if the value is missing just pretend it is -1.
+ const zrRaw = gp.axes[ZR_AXIS] ?? -1; //same as above.
+ const zl = (zlRaw + 1) / 2; //his logic.
+ const zr = (zrRaw + 1) / 2; //his logic.
+ const combined = zr - zl; //ascend - descend
+ if (Math.abs(combined) < 0.05){ //if combined is less than 0.05 just return 0.
+  return 0;
+ }
+ return Math.round(combined * 1000); //his logic. (but multiply by 1000, to not have floats.)
+}
+//------------------------------------------------------------------
+
+function startGamepadLoop(){
+  if (gamepadLoopStarted) return;
+  gamepadLoopStarted = true;
+  appendLog("Browser controller input enabled.");
+  requestAnimationFrame(gamepadLoop);
+}
+
+function gamepadLoop(){
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = gamepads[0];
+
+  if (gp){
+    handleGamepadInput(gp);
+  }
+
+  requestAnimationFrame(gamepadLoop);
+}
+
+//------------------------------------------------------------------
+ function sendMissionCommand(command){
+ if (!missionControlTopic){
+ appendLog("Mission command not sent: ROS publisher not ready.");
+ return;
+ }
+
+ const msg = new ROSLIB.Message({
+ data: command
+ });
+
+ missionControlTopic.publish(msg);
+ appendLog("Sent mission command: " + command);
+ }
+
+ function publishControllerEvent(text){
+ if (!uiControllerTopic){
+  appendLog("Controller event not sent: UI controller publisher not ready.");
+  return;
+ }
+ const msg = new ROSLIB.Message({
+  data: text
+ });
+
+ uiControllerTopic.publish(msg);
+ }
+
+
+ function handleMissionButton(){
+ if (!missionControlTopic){
+  appendLog("Mission publisher still not ready.");
+  return;
+ }
+ if (missionActive){
+  console.log("Mission Ended");
+  appendLog("Mission Ended");
+  sendMissionCommand("END_MISSION");
+  publishControllerEvent("UI: END_MISSION pressed");
+  missionActive = false;
+  currentState = "IDLE";
+ } 
+ else {
+  console.log("Mission Started");
+  appendLog("Mission Started");
+  sendMissionCommand("START_MISSION");
+  publishControllerEvent("UI: START_MISSION pressed");
+  missionActive = true;
+  currentState = "MISSION MODE";
+ }
+
+ updateStateDisplay();
+ updateMissionButton();
+}
+
+ function handleWaterSampleButton(){
+ appendLog("Collect Water Sample button pressed");
+ sendMissionCommand("COLLECT_WATER_SAMPLE");
+ publishControllerEvent("UI: COLLECT_WATER_SAMPLE pressed");
+}
+
+ function bindUI(){
+ updateStateDisplay();
+ updateMissionButton();
+
+ const missionBtn = document.getElementById("missionBtn");
+ if (missionBtn && !missionBtn.dataset.bound){
+  missionBtn.addEventListener("click", handleMissionButton);
+  missionBtn.dataset.bound = "1";
+  missionBtn.disabled = true;
+ }
+
+ const waterSampleBtn = document.getElementById("waterSampleBtn");
+ if (waterSampleBtn && !waterSampleBtn.dataset.bound){
+  waterSampleBtn.addEventListener("click", handleWaterSampleButton);
+  waterSampleBtn.dataset.bound = "1";
+  waterSampleBtn.disabled = true;
+ }
+ }
+
+//--------------------------------------------------------------------------------
+//this is what was suppose to be my controllerapi.py :(
+function handleGamepadInput(gp){
+ const A_BUTTON = 0;
+ const B_BUTTON = 1;
+ const X_BUTTON = 3;
+ const Y_BUTTON = 4;
+ const LB_BUTTON = 6;
+ const RB_BUTTON = 7;
+ const LT_BUTTON = 8;
+ const RT_BUTTON = 9;
+ const SM_L_CIRCLE_BUTTON = 10;
+ const SM_R_CIRCLE_BUTTON = 11;
+ const XBOX_BUTTON = 12;
+ const L_JOYSTICK = 13;
+ const R_JOYSTICK = 14;
+
+ const LEFT_STICK_X = 0;
+ const LEFT_STICK_Y = 1;
+ const RIGHT_STICK_X = 2;
+ const RIGHT_STICK_Y = 3;
+
+ const lx = Math.round((gp.axes[LEFT_STICK_X] ?? 0) * 100);
+ const ly = Math.round((gp.axes[LEFT_STICK_Y] ?? 0) * 100);
+ const rx = Math.round((gp.axes[RIGHT_STICK_X] ?? 0) * 100);
+ const ry = Math.round((gp.axes[RIGHT_STICK_Y] ?? 0) * 100);
+ const z = getTriggerThrust(gp);
+
+ console.log("LX:", lx, "LY:", ly, "RX:", rx, "RY:", ry, "Z:", z);
+ appendLog("ARRAY: [" + lx + ", " + ly + ", " + rx + ", " + ry + ", " + z + "]");
+
+ if (thrusterCommandTopic){
+  const thrusterMsg = new ROSLIB.Message({
+    layout: {
+      dim: [],
+      data_offset: 0
+    },
+    data: [lx, ly, rx, ry, z]
+  });
+
+  thrusterCommandTopic.publish(thrusterMsg);
+}
+
+ if (!prevButtons.length){
+  prevButtons = gp.buttons.map(() => 0);
+ }
+
+ const buttons = gp.buttons.map(b => b.pressed ? 1 : 0);
+
+ if (cmdVelTopic){
+  const twistMsg = new ROSLIB.Message({
+   linear: {
+    x: gp.axes[LEFT_STICK_Y] || 0,
+    y: 0,
+    z: 0
+   },
+   angular: {
+    x: 0,
+    y: 0,
+    z: gp.axes[LEFT_STICK_X] || 0
+   }
+  });
+
+  cmdVelTopic.publish(twistMsg);
+ }
+
+ const missionComboNow =
+  buttons[L_JOYSTICK] === 1 &&
+  buttons[R_JOYSTICK] === 1;
+
+ if (missionComboNow && !prevMissionCombo){
+  if (!missionActive){
+   sendMissionCommand("START_MISSION");
+   publishControllerEvent("Controller: START_MISSION pressed");
+   missionActive = true;
+  }
+  else {
+   sendMissionCommand("END_MISSION");
+   publishControllerEvent("Controller: END_MISSION pressed");
+   missionActive = false;
+  }
+ }
+ prevMissionCombo = missionComboNow;
+
+ const telemetryComboNow =
+  buttons[LB_BUTTON] === 1 &&
+  buttons[RB_BUTTON] === 1;
+
+ if (telemetryComboNow && !prevTelemetryCombo){
+  if (!telemetryActive){
+   sendMissionCommand("START_TELEMETRY");
+   publishControllerEvent("Controller: START_TELEMETRY pressed");
+   telemetryActive = true;
+  }
+  else {
+   sendMissionCommand("STOP_TELEMETRY");
+   publishControllerEvent("Controller: STOP_TELEMETRY pressed");
+   telemetryActive = false;
+  }
+ }
+ prevTelemetryCombo = telemetryComboNow;
+
+ if (buttons[X_BUTTON] === 1 && prevButtons[X_BUTTON] === 0){
+  appendLog("Controller: COLLECT_WATER_SAMPLE pressed");
+  sendMissionCommand("COLLECT_WATER_SAMPLE");
+  publishControllerEvent("Controller: COLLECT_WATER_SAMPLE pressed");
+ }
+
+ if (buttons[Y_BUTTON] === 1 && prevButtons[Y_BUTTON] === 0){
+  if (!videoActive){
+   sendMissionCommand("START_RECORDING_VIDEO");
+   publishControllerEvent("Controller: START_RECORDING_VIDEO pressed");
+   startRecordingUI();
+  }
+  else {
+   sendMissionCommand("STOP_RECORDING_VIDEO");
+   publishControllerEvent("Controller: STOP_RECORDING_VIDEO pressed");
+   stopRecordingUI();
+  }
+ }
+
+ prevButtons = buttons;
+}
+
+ window.addEventListener("gamepadconnected", (e) => { //if controller is connected then it lets us know.
+ appendLog("Controller connected: " + e.gamepad.id);
+ startGamepadLoop();
+ });
+
+ window.addEventListener("gamepaddisconnected", (e) => {
+  appendLog("Controller disconnected: " + e.gamepad.id);
+ });
+//--------------------------------------------------------------------------------
+ function unlockUI(){ //hides the login screen.
+ loginScreen.style.display = "none";
+ app.style.display = "block";
+ bindUI();
+ startRos();
+ }
+
+ function tryLogin(){
+ if (loginCode.value === ACCESS_CODE){
+ sessionStorage.setItem("seastar_authed", "1");
+ unlockUI();
+ } else {
+ loginMsg.textContent = "Wrong code. Try again.";
+ }
+ }
+
+ loginBtn.addEventListener("click", tryLogin);
+ loginCode.addEventListener("keydown", (e) => {
+ if (e.key === "Enter") tryLogin();
+ });
+
+ if (sessionStorage.getItem("seastar_authed") === "1"){
+ unlockUI();
+ } else {
+ setTimeout(() => loginCode.focus(), 50);
+ }
+function startRos(){
+ //ros = new ROSLIB.Ros({ url: "ws://localhost:9090" });
+ ros = new ROSLIB.Ros({ url: "ws://192.168.2.2:9090" });
+
+ // create topics FIRST
+
+ thrusterCommandTopic = new ROSLIB.Topic({
+  ros: ros,
+  name: "/thruster/commands",
+  messageType: "std_msgs/Int16MultiArray"
+ });
+
+ thrusterCommandTopic.advertise();
+ appendLog("Advertised /thruster/commands");
+ console.log("Advertised /thruster/commands");
+
+ cmdVelTopic = new ROSLIB.Topic({ //get rid of this me thinks.
+  ros: ros,
+  name: "/rov/cmd_vel",
+  messageType: "geometry_msgs/Twist"
+ });
+
+ uiControllerTopic = new ROSLIB.Topic({
+  ros: ros,
+  name: "/ui/controller_events",
+  messageType: "std_msgs/String"
+ });
+
+ missionControlTopic = new ROSLIB.Topic({ //creates ROS publisher.
+  ros: ros,
+  name: "/mission/control", 
+  messageType: "std_msgs/String"
+ });
+
+ missionStateSub = new ROSLIB.Topic({ //creates ROS publisher.
+  ros: ros,
+  name: "/Event/command",
+  messageType: "std_msgs/String"
+ });
+
+ const missionCommandSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/mission/control",
+  messageType: "std_msgs/String"
+ });
+
+ const depthSub = new ROSLIB.Topic({ 
+  ros: ros,
+  name: "/sensors/depth",
+  messageType: "std_msgs/Float32"
+ });
+
+ const tempSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/sensors/temp",
+  messageType: "std_msgs/Float32"
+ });
+
+ const pressSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/sensors/pressure",
+  messageType: "std_msgs/Float32"
+ });
+
+ const headSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/nav/heading",
+  messageType: "std_msgs/Float32"
+ });
+
+ const voltSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/power/voltage",
+  messageType: "std_msgs/Float32"
+ });
+
+ const currSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/power/current",
+  messageType: "std_msgs/Float32"
+ });
+
+ const controllerLogTopic = new ROSLIB.Topic({
+  ros: ros,
+  name: "/ui/controller_events",
+  messageType: "std_msgs/String"
+ });
+
+ //subscribe to mission/control so the UI can react to commands too.
+ missionCommandSub.subscribe((msg) => {
+  const command = msg.data.trim().toUpperCase();
+  appendLog("Mission command received: " + command);
+
+  if (command === "START_RECORDING_VIDEO"){
+   startRecordingUI();
+  }
+  else if (command === "STOP_RECORDING_VIDEO"){
+   stopRecordingUI();
+  }
+ });
+
+ missionStateSub.subscribe((msg) => {
+  const incomingState = msg.data.trim().toUpperCase();
+
+  if (
+   incomingState === "MISSION MODE" ||
+   incomingState === "MISSION" ||
+   incomingState === "START_MISSION"
+  ){
+   currentState = "MISSION MODE";
+   missionActive = true;
+  }
+  else if (
+   incomingState === "IDLE" ||
+   incomingState === "BOOT" ||
+   incomingState === "END_MISSION"
+  ){
+   currentState = incomingState === "BOOT" ? "BOOT" : "IDLE";
+   missionActive = false;
+  }
+  else if (incomingState === "FAILURE"){
+   currentState = "Failure";
+   missionActive = false;
+  }
+  else {
+   currentState = msg.data.trim();
+  }
+
+  updateStateDisplay();
+  updateMissionButton();
+  appendLog("Mission state updated: " + currentState);
+ });
+
+ depthSub.subscribe((msg) => {
+  const d = msg.data;
+  setText("depthBig", d.toFixed(1));
+  setText("depthSmall", d.toFixed(1));
+ });
+
+ tempSub.subscribe((msg) => {
+  const t = msg.data;
+  setText("tempBig", t.toFixed(1));
+  setText("tempSmall", t.toFixed(1));
+ });
+
+ pressSub.subscribe((msg) => {
+  setText("pressBig", msg.data.toFixed(2));
+ });
+
+ headSub.subscribe((msg) => {
+  const h = msg.data;
+  const hh = Math.round(h).toString();
+  setText("headingBig", hh);
+  setText("headingSmall", hh);
+ });
+
+ voltSub.subscribe((msg) => {
+  setText("voltBig", msg.data.toFixed(1));
+ });
+
+ currSub.subscribe((msg) => {
+  setText("currBig", msg.data.toFixed(1));
+ });
+
+ controllerLogTopic.subscribe((msg) => {
+  appendLog(msg.data);
+ });
+
+ // THEN do connection handlers
+ ros.on("connection", () => {
+  setConnectedUI(true);
+  appendLog("Connected to ROS bridge.");
+  console.log("Connected to ROS bridge.");
+
+ try {
+  const testMsg = new ROSLIB.Message({
+    layout: {
+      dim: [],
+      data_offset: 0
+    },
+    data: [1, 2, 3, 4, 5]
+  });
+
+  thrusterCommandTopic.publish(testMsg);
+  appendLog("Published test to /thruster/commands");
+  console.log("Published test to /thruster/commands");
+} catch (err) {
+  console.error("Thruster publish failed:", err);
+  appendLog("Thruster publish failed: " + err);
+}
+
+  startGamepadLoop();
+});
+
+ros.on("close", () => {
+  setConnectedUI(false);
+  appendLog("ROS bridge connection closed.");
+});
+}
+ </script>
+ </body>
+</html>
