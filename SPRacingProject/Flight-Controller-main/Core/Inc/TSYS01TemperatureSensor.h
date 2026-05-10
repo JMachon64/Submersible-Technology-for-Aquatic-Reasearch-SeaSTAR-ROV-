@@ -5,11 +5,13 @@
  * Created on April 1, 2026, 9:24 AM
  */
 
+#include "stm32f3xx_hal_i2c.h"
+#include "stm32f3xx.h"
 #include "main.h"
 #include <stdio.h>
 #include <math.h>
 #include "stm32f3xx_hal_i2c.h"
-#include <stdint.h>
+
 
 #define TSYS01_ADDR                        0x77  
 #define TSYS01_RESET                       0x1E
@@ -35,7 +37,12 @@ typedef struct {
 
 }TSY01_TemperatureSensor_t;
 
-
+/* 
+ * 
+ * 
+ * 
+ */
+ 
 uint8_t Init_TSYS01(TSY01_TemperatureSensor_t *Sensor,I2C_HandleTypeDef *hi2c );
 
 uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor);

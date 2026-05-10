@@ -8,9 +8,14 @@
 #ifndef TELEMETRYSTREAM_H
 #define TELEMETRYSTREAM_H
 
-#include "stdint.h"
 #include <stdint.h>
+#include <stdio.h>
 #include "MS5837PressureSensor.h"
+#include "UartProtocol.h"
+#include "PacketIDs.h"
+#include "stm32f3xx_hal.h"
+#include "stm32f3xx_hal_tim.h"
+#include "Uart.h"
 
 typedef struct{
 

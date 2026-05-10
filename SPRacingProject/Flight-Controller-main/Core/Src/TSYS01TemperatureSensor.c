@@ -1,11 +1,5 @@
-#include "stm32f3xx.h"
-#include "stm32f3xx_hal_i2c.h"
-#include <stdint.h>
 #include "TelemetryStream.h"
 #include "TSYS01TemperatureSensor.h"
-
-
-
 
 
 static HAL_StatusTypeDef TSYS01_WriteCommand(TSY01_TemperatureSensor_t *Sensor, uint8_t Command)
@@ -57,64 +51,28 @@ uint8_t Init_TSYS01(TSY01_TemperatureSensor_t *Sensor, I2C_HandleTypeDef *hi2c)
     return 1;
 }
 
+uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor){
 
-uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor)
-{
-    uint8_t buffer[3] = {0};
-    HAL_StatusTypeDef status;
+    uint8_t buffer[3];
 
-    status = TSYS01_WriteCommand(Sensor, TSYS01_ADC_TEMP_CONV);
-    if (status != HAL_OK) {
-        printf("TSYS01: temp conv cmd failed\r\n");
-        return 0;
-    }
+    TSYS01_WriteCommand(Sensor, TSYS01_ADC_TEMP_CONV);
 
     HAL_Delay(10);
 
-    status = TSYS01_WriteCommand(Sensor, TSYS01_ADC_READ);
-    if (status != HAL_OK) {
-        printf("TSYS01: adc read cmd failed\r\n");
-        return 0;
-    }
+    TSYS01_WriteCommand(Sensor, TSYS01_ADC_READ);
 
-    status = TSYS01_ReadBytes(Sensor, buffer, 3);
-    if (status != HAL_OK) {
-        printf("TSYS01: adc byte read failed\r\n");
-        return 0;
-    }
-
-    Sensor->ADC_Value = ((uint32_t)buffer[0] << 16) | ((uint32_t)buffer[1] << 8)  | ((uint32_t)buffer[2]);
-
+    TSYS01_ReadBytes(Sensor, buffer, 3);
+    
+    Sensor -> ADC_Value = ((uint32_t)buffer[0] << 16 | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2]);
+    printf("TEMP: %lu\r\n", Sensor -> ADC_Value);
     Calculate_TSYS01(Sensor);
 
     //store temp
     environmetal_telemetry_packet.temp = (int32_t)(Sensor->Temperature_C * 1000.0f);
 
-
-    // TelemetryStream_SendEnvironmental(&environmetal_telemetry_packet);
-
-
     return 1;
+
 }
-// uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor){
-
-//     uint8_t buffer[3];
-
-//     TSYS01_WriteCommand(Sensor, TSYS01_ADC_TEMP_CONV);
-
-//     HAL_Delay(10);
-
-//     TSYS01_WriteCommand(Sensor, TSYS01_ADC_READ);
-
-//     TSYS01_ReadBytes(Sensor, buffer, 3);
-    
-//     Sensor -> ADC_Value = ((uint32_t)buffer[0] << 16 | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2]);
-//     printf("TEMP: %lu\r\n", Sensor -> ADC_Value);
-//     Calculate_TSYS01(Sensor);
-
-//     return 1;
-
-// }
 
 void Calculate_TSYS01(TSY01_TemperatureSensor_t *Sensor){
 
@@ -127,20 +85,18 @@ void Calculate_TSYS01(TSY01_TemperatureSensor_t *Sensor){
                               (-1.5f) * ((float)Sensor -> Coefficients[5]) / 100.0f;
 
       float temp = Sensor->Temperature_C;
-
-      // truncate to 3 decimal places (NOT rounding)
-    //   float truncated = ((int)(temp * 1000)) / 1000.0f;
-    //   printf("Temperature: %.3f C\r\n", truncated);
       
 }
 
 
 
+//I DID NOT MAKE SURE THIS WORKED 
+
 // void readTestCase_TSYS01() {
 // 	C[0] = 0;
 // 	C[1] = 28446;  //0xA2 K4
 // 	C[2] = 24926;  //0XA4 k3
-//  	C[3] = 36016;  //0XA6 K2
+// 	C[3] = 36016;  //0XA6 K2
 // 	C[4] = 32791;  //0XA8 K1
 // 	C[5] = 40781;  //0XAA K0
 // 	C[6] = 0;

@@ -1,7 +1,16 @@
-#include <stdint.h>
 
-#define LEAK_SENSOR_PORT GPIOB
-#define LEAK_SENSOR_PIN  GPIO_PIN_5
+
+#include "main.h"
+#include "stm32f3xx_hal.h"
+#include "stm32f3xx_it.h"
+#include "FSM.h"
+#include "UartProtocol.h"
+#include "PacketIDs.h"
+#include <stdint.h>
+#include <stdio.h>
+
+
+
 
 /* 
  * 

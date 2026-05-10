@@ -7,7 +7,7 @@
 #include "pwm.h"
 #include "stm32f3xx_hal.h"
 
-static SeaSTAR_FSM_t starfystate = MISSION_MODE_IDLE;
+static SeaSTAR_FSM_t starfystate = MISSION_MODE_ACTIVE;
 
 static volatile SeaSTAR_FSM_Event_t pending_event = FSM_EVENT_NONE;
 
@@ -31,21 +31,6 @@ uint8_t SeaSTAR_FSM(void)
             }
             break;
 
-        case MISSION_MODE_IDLE:
-            if (event == FSM_EVENT_START_MISSION)
-            {
-                starfystate = MISSION_MODE_ACTIVE;
-                printf("Transition: [IDLE] -> [ACTIVE]\r\n");
-            }
-
-            else if (event == FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE || 
-                event == FSM_EVENT_LEAK_DETECTED)
-            {
-                starfystate = FAILURE_MODE;
-                printf("Transition: [IDLE] -> [FAILURE]\r\n");
-            }
-            break;
-
         case MISSION_MODE_ACTIVE:
 
             if (event == FSM_EVENT_END_MISSION)
@@ -53,7 +38,12 @@ uint8_t SeaSTAR_FSM(void)
                 starfystate = MISSION_MODE_IDLE;
                 printf("Transition: [ACTIVE] -> [IDLE]\r\n");
             }
-            else if (event == FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE || event == FSM_EVENT_LEAK_DETECTED)
+            if (event == FSM_EVENT_COLLECT_WATER_SAMPLE)
+            {
+                starfystate = COLLECT_WATER_SAMPLE_MODE;
+                printf("Transition: [ACTIVE] -> [COLLECTINGWATERSAMPLE]\r\n");
+            }
+            else if (event == FSM_EVENT_LEAK_DETECTED)
             {
                 starfystate = FAILURE_MODE;
                 printf("Transition: [ACTIVE] -> [FAILURE]\r\n");
@@ -62,22 +52,27 @@ uint8_t SeaSTAR_FSM(void)
 
         case FAILURE_MODE:
         {
-            Control_Update_Command(0, 0, 0, 0, 0, 0); //SHUTOFF ALL THRUSTERS IN THE EVENT OF AN EMERGENCY
+            Control_Update_Command(0, 0, 0, 0, 0, 0);
+             //SHUTOFF ALL THRUSTERS IN THE EVENT OF AN EMERGENCY
 
 
-            PWM_SampleClose();
-            if (event == FSM_EVENT_COMMUNICATION_RECONNECTION_SUCCESS)
-            {
-              
-
-
-                printf("Transition: [FAILURE] -> [IDLE]\r\n");
-
-            }
+            // if (event == FSM_EVENT_COMMUNICATION_RECONNECTION_SUCCESS)
+            // {
+            //     printf("Transition: [FAILURE] -> [IDLE]\r\n");
+            // }
 
             break;
         }
 
+        case COLLECT_WATER_SAMPLE_MODE:
+        {
+            PWM_SampleClose();
+
+            starfystate = MISSION_MODE_ACTIVE;
+
+            break;
+
+        }
         default:
             starfystate = BOOT_MODE;
             break;

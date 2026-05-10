@@ -1,55 +1,36 @@
 
 
 #include "MS5837PressureSensor.h"
-#include "stm32f3xx.h"
-#include "stm32f3xx_hal_i2c.h"
-#include <stdint.h>
-#include <stdio.h>
 #include "TelemetryStream.h"
-// static const uint16_t fluiddensity = 1029;
-#define BAD_LOW_PRESSURE_PA      80000.0f
-#define BAD_MODE_REFERENCE_PA    73850.0f
-#define EXPECTED_SURFACE_PA      101300.0f
 
-volatile float bad_mode_offset_pa =
-    EXPECTED_SURFACE_PA - BAD_MODE_REFERENCE_PA;
+// static const uint16_t fluiddensity = 1029;
+
 volatile float pressure_offset = 28820.0f;
 volatile float surface_pressure_pa = 0.0f;
 volatile uint8_t baseline_set = 0;
 
-
-#define BAD_ENTER_PRESSURE_PA     80000.0f
-#define BAD_EXIT_PRESSURE_PA      90000.0f
-#define BAD_MODE_REFERENCE_PA     73850.0f
-#define EXPECTED_SURFACE_PA       101300.0f
-
-static uint8_t pressure_bad_mode = 0;
-
-float MS5837_CorrectPressurePa(float pressure_pa)
+float Callibrate_MS5837(MS5837_PressureSensor_t *Sensor, uint16_t Samples)
 {
-    if (pressure_pa <= 0.0f)
+    float sum = 0.0f;
+
+    for (uint8_t i = 0; i < 10; i++)
     {
-        return pressure_pa;
+        Read_MS5837(Sensor);
+        HAL_Delay(50);
     }
 
-    // Enter bad mode only when pressure drops clearly too low
-    if (!pressure_bad_mode && pressure_pa < BAD_ENTER_PRESSURE_PA)
+    for (uint16_t i = 0; i < Samples; i++)
     {
-        pressure_bad_mode = 1;
+        Read_MS5837(Sensor);
+        sum += Sensor->Pressure_Pa;
+        HAL_Delay(50);
     }
 
-    // Exit bad mode only when pressure clearly returns near normal
-    if (pressure_bad_mode && pressure_pa > BAD_EXIT_PRESSURE_PA)
-    {
-        pressure_bad_mode = 0;
-    }
+    float baseline = sum / Samples;
 
-    if (pressure_bad_mode)
-    {
-        return pressure_pa + (EXPECTED_SURFACE_PA - BAD_MODE_REFERENCE_PA);
-    }
-
-    return pressure_pa;
+    printf("Surface baseline = %ld Pa\r\n", (int32_t)baseline);
+	baseline_set = 1;
+    return baseline;
 }
 
 static HAL_StatusTypeDef MS5837_WriteCommand(MS5837_PressureSensor_t *Sensor, uint8_t Command)
@@ -71,14 +52,13 @@ uint8_t Init_MS5837(MS5837_PressureSensor_t *Sensor,I2C_HandleTypeDef *hi2c){
     Sensor -> hi2c = hi2c;
     Sensor -> Address = (MS5837_ADDR << 1); //stm32 requires one bit shift 
 
-	// Reset the TSYS01, per datasheet
+
     MS5837_WriteCommand(Sensor, MS5837_RESET);
 
 	HAL_Delay(20); //Maximum required command write period
 
 	
 	// Read calibration values
-
 	for ( uint8_t i = 0 ; i < 7 ; i++ ) {
 
         // read command 
@@ -95,14 +75,12 @@ uint8_t Init_MS5837(MS5837_PressureSensor_t *Sensor,I2C_HandleTypeDef *hi2c){
     uint8_t crcCalculated = crc4(Sensor->Coefficients);
     for (uint8_t i = 0; i < 7; i++)
         {
-             printf("C[%d] = %u\r\n", i, Sensor->Coefficients[i]);
+            printf("C[%d] = %u\r\n", i, Sensor->Coefficients[i]);
         }
 
     printf("CRC read = %u, CRC calc = %u\r\n", crcRead, crcCalculated);
     printf("Model = %d\r\n", Sensor->Model);
 	// Verify that data is correct with CRC
-	// uint8_t crcRead = Sensor -> Coefficients[0] >> 12;
-	// uint8_t crcCalculated = crc4(Sensor -> Coefficients);
 
 	if ( crcCalculated != crcRead ) {
 		return 0; // CRC fail
@@ -124,11 +102,7 @@ uint8_t Init_MS5837(MS5837_PressureSensor_t *Sensor,I2C_HandleTypeDef *hi2c){
 	{
 		Sensor -> Model = MS5837_30BA;
 	}
-
-	printf("Final Model = %d\r\n", Sensor->Model);
 	return 1;
-
-
 }
 
 uint8_t  MS5837_GetModel(MS5837_PressureSensor_t *Sensor){
@@ -136,92 +110,45 @@ uint8_t  MS5837_GetModel(MS5837_PressureSensor_t *Sensor){
 }
 
 
-float Callibrate_MS5837(MS5837_PressureSensor_t *Sensor, uint16_t Samples)
-{
-    float sum = 0.0f;
-
-    // Throw away startup/stale readings
-    for (uint8_t i = 0; i < 10; i++)
-    {
-        Read_MS5837(Sensor);
-        HAL_Delay(50);
-    }
-
-    for (uint16_t i = 0; i < Samples; i++)
-    {
-        Read_MS5837(Sensor);
-        sum += Sensor->Pressure_Pa;
-        HAL_Delay(50);
-    }
-
-    float baseline = sum / Samples;
-
-    printf("Surface baseline = %ld Pa\r\n", (int32_t)baseline);
-	baseline_set = 1;
-    return baseline;
-}
-
 uint8_t Read_MS5837(MS5837_PressureSensor_t *Sensor)
 {
+
     uint8_t buffer[3];
-    HAL_StatusTypeDef st;
 
-    st = MS5837_WriteCommand(Sensor, MS5837_CONVERT_D1_8192);
-    if (st != HAL_OK) return 0;
+	// Request D1 conversion
+    MS5837_WriteCommand(Sensor, MS5837_CONVERT_D1_8192);
 
-    HAL_Delay(20);
+    HAL_Delay(20); // Max conversion time per datasheet
 
-    st = MS5837_WriteCommand(Sensor, MS5837_ADC_READ);
-    if (st != HAL_OK) return 0;
+    // Begin reading the bytes
+    MS5837_WriteCommand(Sensor, MS5837_ADC_READ);
 
-    st = MS5837_ReadBytes(Sensor, buffer, 3);
-    if (st != HAL_OK) return 0;
+    MS5837_ReadBytes(Sensor, buffer, 3);
 
-    uint32_t d1 = ((uint32_t)buffer[0] << 16) |
-                  ((uint32_t)buffer[1] << 8)  |
-                  ((uint32_t)buffer[2]);
+    Sensor -> D1_ADC_Pressure = ((uint32_t)buffer[0] << 16 | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2]);
 
-    st = MS5837_WriteCommand(Sensor, MS5837_CONVERT_D2_8192);
-    if (st != HAL_OK) return 0;
+    // Request D2 conversion
 
-    HAL_Delay(20);
+    MS5837_WriteCommand(Sensor, MS5837_CONVERT_D2_8192);
+    
+    HAL_Delay(20); // Max conversion time per datasheet
+    
+    MS5837_WriteCommand(Sensor, MS5837_ADC_READ);
+    MS5837_ReadBytes(Sensor, buffer, 3);
 
-    st = MS5837_WriteCommand(Sensor, MS5837_ADC_READ);
-    if (st != HAL_OK) return 0;
+    Sensor -> D2_ADC_Temperature = ((uint32_t)buffer[0] << 16 | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2]);
 
-    st = MS5837_ReadBytes(Sensor, buffer, 3);
-    if (st != HAL_OK) return 0;
-
-    uint32_t d2 = ((uint32_t)buffer[0] << 16) |
-                  ((uint32_t)buffer[1] << 8)  |
-                  ((uint32_t)buffer[2]);
-
-    // reject obviously bad reads
-    if (d1 == 0 || d2 == 0 || d1 == 0xFFFFFF || d2 == 0xFFFFFF) {
-        return 0;
-    }
-
-    Sensor->D1_ADC_Pressure = d1;
-    Sensor->D2_ADC_Temperature = d2;
 
 	Calculate_MS5837(Sensor);
+
 	Sensor->Pressure_Pa = MS5837_GetPressure(Sensor, MS5837Pa);
+	Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
 
-
-	Sensor->Pressure_mbar = MS5837_GetPressure(Sensor, MS5837mbar);
-	// Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
-	// // printf("%0.2f\n", Sensor -> Pressure_mbar);
-
-    // environmetal_telemetry_packet.depth = (int32_t)(Sensor->Depth_m * 1000.0f);
-
-    // environmetal_telemetry_packet.pressure_Pa = (int32_t)(Sensor->Pressure_Pa);
-
-	// environmetal_telemetry_packet.pressure_mBar = (int32_t)(Sensor->Pressure_mbar * 100.0f);
-
-    // environmetal_telemetry_packet.temp = (int32_t)(MS5837_GetTemp(Sensor) * 100.0f);
 
     return 1;
 }
+
+
 
 void Calculate_MS5837(MS5837_PressureSensor_t *Sensor) {
 
@@ -295,17 +222,16 @@ void Calculate_MS5837(MS5837_PressureSensor_t *Sensor) {
 float MS5837_GetPressure(MS5837_PressureSensor_t *Sensor, float conversion) {
 
 	if (Sensor -> Model == MS5837_02BA ) {
-		return  Sensor->Pressure * conversion/100.0f;
+		return  (Sensor->Pressure * conversion/100.0f); 
 	}
 	else {
-		return  Sensor->Pressure * conversion/10.0f;
+		return  (Sensor->Pressure * conversion/10.0f);
 	}
 
 }
 
 float MS5837_GetTemp(MS5837_PressureSensor_t *Sensor) {
 	return Sensor->Temperature / 100.0f;
-		// return Sensor->Temperature/ ;
 }
 
 // // The pressure sensor measures absolute pressure, so it will measure the atmospheric pressure + water pressure
@@ -314,13 +240,16 @@ float MS5837_GetTemp(MS5837_PressureSensor_t *Sensor) {
 // // If the atmospheric pressure is not 101300 at the time of reading, the depth reported will be offset
 // // In order to calculate the correct depth, the actual atmospheric pressure should be measured once in air, and
 // // that value should subtracted for subsequent depth calculations.
-float MS5837_GetDepth(MS5837_PressureSensor_t *Sensor, float fluiddensity)
-{
-    float pressure_pa = MS5837_CorrectPressurePa(Sensor->Pressure_Pa);
-    float baseline_pa = MS5837_CorrectPressurePa(surface_pressure_pa);
+float MS5837_GetDepth(MS5837_PressureSensor_t *Sensor, float fluiddensity) {
 
-    return (pressure_pa - baseline_pa) / (fluiddensity * 9.80665f);
+
+	float depth = (Sensor -> Pressure_Pa - surface_pressure_pa) / (fluiddensity * 9.80665);
+
+
+	return depth;
+
 }
+
 float MS5837_GetAltitude(MS5837_PressureSensor_t *Sensor) {
 
     float pressure_mbar = MS5837_GetPressure(Sensor, MS5837mbar);
@@ -329,6 +258,7 @@ float MS5837_GetAltitude(MS5837_PressureSensor_t *Sensor) {
 	Sensor -> Pressure_bar = pressure_mbar / 1000.0f;
 
 	return (1-pow((pressure_mbar/1013.25), .190284)) * 145366.45 * .3048;
+
 }
 
 
@@ -357,4 +287,5 @@ uint8_t crc4(uint16_t *Coefficient) {
 
 	return n_rem ^ 0x00;
 }
+
 

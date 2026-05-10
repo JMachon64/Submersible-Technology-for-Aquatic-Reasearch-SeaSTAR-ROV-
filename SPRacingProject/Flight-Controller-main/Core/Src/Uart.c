@@ -1,9 +1,4 @@
-#include "main.h"
-#include "stm32f3xx_hal_dma.h"
-#include "stm32f3xx_hal_uart.h"
 #include "Uart.h"
-#include <stdint.h>
-#include <stdio.h>
 
 static uint8_t uart3_dma_rx_buf[DMA_RX_BUF_SIZE];
 

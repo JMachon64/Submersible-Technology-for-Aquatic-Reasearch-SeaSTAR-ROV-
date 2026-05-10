@@ -39,13 +39,15 @@
 #include "MS5837PressureSensor.h"
 #include "LeakDetection.h"
 #include "tim.h"
-#include "Mux.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
 TSY01_TemperatureSensor_t temp_sensor;
 MS5837_PressureSensor_t pressure_sensor;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -75,13 +77,13 @@ void I2C_Scan(void)
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-osThreadId_t uartTaskHandle;
-const osThreadAttr_t uartTask_attributes = {
-  .name = "uartTask",
+
+osThreadId_t SamplingTaskHandle;
+const osThreadAttr_t SamplingTask_attributes = {
+  .name = "SamplingTask",
   .stack_size = 384 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-
 
 uint8_t uart2_rx_byte;
 
@@ -118,8 +120,10 @@ const osThreadAttr_t PropulsionTask_attributes = {
   .stack_size = 384 * 4,
   .priority = (osPriority_t) osPriorityNormal1,
 };
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
+
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
@@ -129,16 +133,17 @@ const osThreadAttr_t defaultTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void StartUartTask(void *argument);
+
+void StartSamplingTask(void *argument);
 void StartWiredUARTStream(void *argument);
 void StartStateMachineTask(void *argument);
 void StartTelemetryStreamTask(void *argument);
 void StartSystemHealthMonitorTask(void *argument);
 void Propulsion_Task(void *argument);
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
-
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
@@ -146,7 +151,9 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   * @param  None
   * @retval None
   */
+
 void MX_FREERTOS_Init(void) {
+
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -169,29 +176,17 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  // defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-   uartTaskHandle = osThreadNew(StartUartTask, NULL, &uartTask_attributes);
-  // UartStreamTaskHandle = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
-  // StateMachineTaskHandle = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
-  // SystemHealthMonitorTask = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
-  TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
-  // PropulsionTaskHandle = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
- 
-  if (UartStreamTaskHandle == NULL) {
-      printf("Failed to create UART task\r\n");
-  }
-  if (StateMachineTaskHandle == NULL) {
-      printf("Failed to create state machine task\r\n");
-  }
-  if (TelemetryStreamTaskHandle == NULL) {
-      printf("Failed to create telemetry task\r\n");
-  }
 
-  if (PropulsionTaskHandle == NULL) {
-      printf("Failed to create propulsion task\r\n");
-  }
+   SamplingTaskHandle = osThreadNew(StartSamplingTask, NULL, &SamplingTask_attributes);
+   UartStreamTaskHandle = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
+   StateMachineTaskHandle = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
+   SystemHealthMonitorTask = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
+   TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
+   PropulsionTaskHandle = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -207,17 +202,22 @@ void MX_FREERTOS_Init(void) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
+
+
+
+//ALEX THIS WAS YOUR INITIAL DEFAULT TASK I DID NOT TOUCH IT
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+
   PWM_Init();
 
-
+  Control_Update_Command(0,0,0,0,0,0);
   printf("Started default task...\n");
 
   uint8_t test = MPU6050_Init(&hi2c1);
 
-    osDelay(100);
+  osDelay(100);
 
   MPU6050_t data;
 
@@ -225,10 +225,11 @@ void StartDefaultTask(void *argument)
   while(1){
 
     MPU6050_Read_All(&data);
-    //printf("%f, %f, %f\n", data.Ax, data.Ay, data.Az);
+    printf("%f, %f, %f\n", data.Ax, data.Ay, data.Az);
 
     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_3);
     osDelay(100);
+    
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -236,17 +237,13 @@ void StartDefaultTask(void *argument)
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
-// void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-// 	HAL_UART_Receive_IT(&huart1, buffer, 1);
-// 	HAL_UART_Transmit(&huart1, buffer, 1, 0xFFFF);
-// }
-
-void StartUartTask(void *argument){
+void StartSamplingTask(void *argument){
 
 
   printf("\r\n");
   printf("|Sampling Task has been initialized...|\r\n");
   printf("\r\n");
+
   for(;;)
   {
 
@@ -254,13 +251,16 @@ void StartUartTask(void *argument){
     {
         sample_flag = 0;
 
-        if (baseline_set)
+        if (baseline_set) //Baseline set means the pressure sensor has been callibrated around the initial atmospheric pressure readings 
         {
-        pressure_sensor.Depth_m = MS5837_GetDepth(&pressure_sensor, 1000.0f);
+        
+          environmetal_telemetry_packet.depth = (int32_t)(pressure_sensor.Depth_m * 1000.0f);
+          environmetal_telemetry_packet.pressure_Pa = (int32_t)(pressure_sensor.Pressure_Pa);
+          environmetal_telemetry_packet.temp = (int32_t)(temp_sensor.Temperature_C * 1000.00f);
+          environmetal_telemetry_packet.timestamp_ms = HAL_GetTick();
 
-        environmetal_telemetry_packet.pressure_Pa =
-            (int32_t)MS5837_CorrectPressurePa(pressure_sensor.Pressure_Pa);
-        TelemetryStream_SendEnvironmental(&environmetal_telemetry_packet);
+          TelemetryStream_SendEnvironmental(&environmetal_telemetry_packet);
+
         }
     }
     osDelay(1);
@@ -273,15 +273,17 @@ void StartWiredUARTStream(void *argument)
     printf("\r\n");
     printf("|Uart Task has been initialized...|\r\n");
     printf("\r\n");
+
     Packet_Sent_t rxPacket;
 
     for (;;)
     {
-        Protocol_ProcessTxQueue();
+
+  
         UART3_Traverse_RxDMA();
+
         if (BuildRxPacket(&rxPacket, 0))
         {
-  
             Protocol_ParsePacket(&rxPacket);
         }
         Protocol_UpdateThroughput(); //count the throughput 
@@ -294,14 +296,15 @@ void StartWiredUARTStream(void *argument)
 void StartStateMachineTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
+
   printf("\r\n");
   printf("|State Machine Task has been initialized...|\r\n");
   printf("\r\n");
+
   /* Infinite loop */
   for(;;)
   {
     SeaSTAR_FSM();
-
     osDelay(1);
   }
   /* USER CODE END 5 */
@@ -316,9 +319,11 @@ void StartSystemHealthMonitorTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_4);  //TEST THE NAV LIGHTS BY TOGGLING
     LeakSensor_Read();
     osDelay(200);
   }
+
   /* USER CODE END 5 */
 }
 void Propulsion_Task(void *argument)
@@ -343,39 +348,29 @@ void StartTelemetryStreamTask(void *argument)
     PWM_Init();
 
 
-    printf("Started default task...\n");
-
-    uint8_t test = MPU6050_Init(&hi2c1);
+    printf("Started Telemetry Stream Task...\n");
 
     printf("MUX OFF SCAN:\r\n");
     I2C_Scan();
 
+    Init_TSYS01(&temp_sensor, &hi2c1);
+    Init_MS5837(&pressure_sensor, &hi2c1);
 
-    MPU6050_t data;
-
-    //Init_TSYS01(&temp_sensor, &hi2c1);
-    uint8_t ok = Init_MS5837(&pressure_sensor, &hi2c1);
-    if (!ok)
-    {
-        printf("MS5837 INIT FAILED\r\n");
-    }
-    else
-    {
-        surface_pressure_pa =
-            Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
-    }
-    //surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
-
+    // Take the average of the initial atmospheric pressure reading
+    surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
+    
   for (;;)
   {
       if (sensor_flag)
       {
           sensor_flag = 0;
 
-          //Read_TSYS01(&temp_sensor);
+          Read_TSYS01(&temp_sensor);
           Read_MS5837(&pressure_sensor);
       }
+
       osDelay(1);
+
   }
 }
 

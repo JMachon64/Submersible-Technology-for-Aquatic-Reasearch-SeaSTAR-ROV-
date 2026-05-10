@@ -89,7 +89,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+    HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -216,13 +216,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         sensorcounter++;
         packetsendcounter++;
 
-        if (sensorcounter >= 90) {
+        if (sensorcounter >= 60) {
             sensor_flag = 1;
             sensorcounter = 0;
         }
 
-        uint16_t send_period = (send_phase == 0) ? 99 : 100;
-        if (packetsendcounter >= 100) {
+        if (packetsendcounter >= 200) {
             sample_flag = 1;
             packetsendcounter = 0;
             send_phase ^= 1;

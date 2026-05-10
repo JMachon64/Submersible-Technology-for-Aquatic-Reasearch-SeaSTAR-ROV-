@@ -1,15 +1,6 @@
 
-#include "main.h"
-#include "Uart.h"
+
 #include "UartProtocol.h"
-#include "PacketIDs.h"
-#include <stdio.h>
-#include "stm32f3xx_hal.h"
-#include "FSM.h"
-#include "TelemetryStream.h"
-#include "ControlLoop.h"
-
-
 
 #define TX_QUEUE_SIZE 24
 
@@ -25,47 +16,7 @@ static volatile uint8_t txTail = 0;
 
 
 
-uint8_t Protocol_QueuePacket(uint8_t len, uint8_t ID, void *Payload)
-{
-    if (len > MAXPAYLOADLENGTH) {
-        return 0;
-    }
 
-    uint8_t nextHead = (txHead + 1) % TX_QUEUE_SIZE;
-
-    // Queue full
-    if (nextHead == txTail) {
-        return 0;
-    }
-
-    txQueue[txHead].len = len;
-    txQueue[txHead].id = ID;
-
-    for (uint8_t i = 0; i < len; i++) {
-        txQueue[txHead].payload[i] = ((uint8_t *)Payload)[i];
-    }
-
-    txHead = nextHead;
-    return 1;
-}
-
-
-void Protocol_ProcessTxQueue(void)
-{
-    if (txTail == txHead) {
-        return; // queue empty
-    }
-
-    TxQueuedPacket_t *pkt = &txQueue[txTail];
-
-    Protocol_SendPacket(
-        pkt->len,
-        pkt->id,
-        pkt->payload
-    );
-
-    txTail = (txTail + 1) % TX_QUEUE_SIZE;
-}
 uint16_t CalculateCyclicalRedundancyCheck(const uint8_t *data, uint16_t length)
  {
     uint16_t crc = 0xFFFF;
@@ -144,12 +95,13 @@ void Protocol_UpdateThroughput(void)
         uint32_t ping = Ping_Packets;
         uint32_t throughput = (bytes * 100) / BAUDRATEBYTES;
 
-        printf("Bytes/sec: %lu, CTRL/sec: %lu, PING/sec: %lu, Throughput: %lu%%\r\n", bytes, ctrl, ping, throughput);
+        //printf("Bytes/sec: %lu, CTRL/sec: %lu, PING/sec: %lu, Throughput: %lu%%\r\n", bytes, ctrl, ping, throughput);
 
         Packet_Bytes = 0;
         Control_Packets = 0;
         Ping_Packets = 0;
         last_time = now;
+
     }
 }
 
@@ -253,7 +205,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
         {
             uint32_t acknowlegdment_timestamp_ms = HAL_GetTick();
             printf("HELLO...\n\n");
-            Protocol_QueuePacket(4, ID_STM32_HELLO, &acknowlegdment_timestamp_ms);
+            Protocol_SendPacket(4, ID_STM32_HELLO, &acknowlegdment_timestamp_ms);
             break;
         }
 
@@ -268,9 +220,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
                 break;
             }
 
-
-            Protocol_QueuePacket(4, ID_PONG, packet->payLoad);
-
+            Protocol_SendPacket(4, ID_PONG, packet->payLoad);
             break;
         }
 
@@ -285,6 +235,13 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             break;
         }
 
+        if(leakLatched){
+
+            //printf("Blocking control packets due to a leak...\n");
+            break;
+
+        }
+
         int16_t x1 = (int16_t)(((uint16_t)packet->payLoad[0]) | ((uint16_t)packet->payLoad[1] << 8));
         int16_t y1 = (int16_t)(((uint16_t)packet->payLoad[2]) | ((uint16_t)packet->payLoad[3] << 8));
         int16_t x2 = (int16_t)(((uint16_t)packet->payLoad[4]) | ((uint16_t)packet->payLoad[5] << 8));
@@ -296,7 +253,6 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
         // Apply command
         Control_Update_Command(x1, y1, x2, y2, trigger, seq);
-
         break;
     }
 
@@ -305,7 +261,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
         case ID_START_MISSION:
         {
 
-            Protocol_QueuePacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
+            Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             printf("START MISSION\n");
             FSM_PostEvent(FSM_EVENT_START_MISSION);
             break;
@@ -316,50 +272,40 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
             printf("END MISSION\n");
 
-            Protocol_QueuePacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
+            Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             FSM_PostEvent(FSM_EVENT_END_MISSION);
-            
-   
-
-         
+        
             break;
         }
 
         // SYSTEM SETTING COMMANDS
         //IMPLEMENT THESE LATER 
-        case ID_SET_CONTROL_LOOP_GAINS:
-        {break;}
 
         case ID_COLLECT_WATER_SAMPLE:
         {
 
-
-            
-            uint32_t seq =
-                ((uint32_t)packet->payLoad[0]) |
-                ((uint32_t)packet->payLoad[1] << 8) |
-                ((uint32_t)packet->payLoad[2] << 16) |
-                ((uint32_t)packet->payLoad[3] << 24);
-            uint8_t ack_payload[4];
-
-            ack_payload[0] = seq & 0xFF;
-            ack_payload[1] = (seq >> 8) & 0xFF;
-            ack_payload[2] = (seq >> 16) & 0xFF;
-            ack_payload[3] = (seq >> 24) & 0xFF;
-
-            Protocol_QueuePacket(4, ID_PACKET_ACKNOWLEGDED, ack_payload);
             FSM_PostEvent(FSM_EVENT_COLLECT_WATER_SAMPLE);
             
             printf("COLLECTING WATER SAMPLE...\n");
-
-            uint32_t acknowlegdment_timestamp_ms = HAL_GetTick();
-
-     
-
-            // Set_Servo(2000);
+            
+            Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
 
             break;
         }
+        case ID_NAVIGATION_LIGHTS_ON:
+        {
+            
+            printf("LIGHTS ON...\n");
+            NavigationLights_On();            
+            break;
+        }  
+        case ID_NAVIGATION_LIGHTS_OFF:
+        {
+            printf("LIGHTS OFF...\n");
+            NavigationLights_Off();
+            
+            break;
+        }  
         default:
         {
             printf("Unknown packet ID: 0x%02X\r\n", packet->ID);

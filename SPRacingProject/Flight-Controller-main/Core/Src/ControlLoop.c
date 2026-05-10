@@ -1,8 +1,5 @@
 
 #include "ControlLoop.h"
-#include "UartProtocol.h"
-#include <stdint.h>
-#include "pwm.h"
 
 
 volatile control_command_t thruster_command = {0};
@@ -26,22 +23,25 @@ void Control_Update_Command(int16_t x1, int16_t y1, int16_t x2, int16_t y2,
     uint16_t s4 = (y2/2.0)+1500;
     uint16_t s5 = (trigger/2.0)+1500;
 
-    // printf("%d\n", x1);
-
-    // PWM_SetThrusterPeriods(s1,s2,s3,s4,s5);
-    // if (x1>100){
-    //     printf("RIGHT\n");
-    // }
-    // if (x1<-100){
-    //     printf("LEFT\n");
-    // }
+    PWM_SetThrusterPeriods(s1,s2,s3,s4,s5);
+    if (x1>100){
+        printf("%d\n", x1);
+    }
+    if (x1<-100){
+        printf("LEFT\n");
+    }
 
 }
 
-void Set_Servo(uint16_t angle){
 
+void NavigationLights_On(void){
 
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
 
+}
 
+void NavigationLights_Off(void){
+
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
     
 }

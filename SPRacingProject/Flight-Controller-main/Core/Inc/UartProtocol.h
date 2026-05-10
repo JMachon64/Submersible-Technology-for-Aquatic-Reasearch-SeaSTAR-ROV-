@@ -4,10 +4,20 @@
  *
  * Created on April 1, 2026, 9:24 AM
  */
+ 
+
 
 #ifndef UARTPROTOCOL_H
 #define UARTPROTOCOL_H
-
+#include "main.h"
+#include "Uart.h"
+#include "PacketIDs.h"
+#include "stm32f3xx_hal.h"
+#include "FSM.h"
+#include "TelemetryStream.h"
+#include "ControlLoop.h"
+#include "LeakDetection.h"
+#include <stdio.h>
 #define HEAD 204
 
 #define PACKETBUFFERSIZE 64
@@ -49,8 +59,10 @@ uint8_t CalculateThroughPut(void);
 
 uint8_t Protocol_SendPacket(uint8_t len, uint8_t ID, void *Payload);
 
-void Protocol_UpdateThroughput(void);
+void Protocol_UpdateThroughput(void)
+;
 void Protocol_ProcessTxQueue(void);
+
 uint8_t Protocol_QueuePacket(uint8_t len, uint8_t ID, void *Payload);
 
 #endif

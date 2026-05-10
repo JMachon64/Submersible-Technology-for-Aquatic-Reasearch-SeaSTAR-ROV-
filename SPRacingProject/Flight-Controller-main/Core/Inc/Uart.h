@@ -8,7 +8,12 @@
 #ifndef UART_H
 #define UART_H
 
+
+#include "main.h"
+#include "stm32f3xx_hal_dma.h"
+#include "stm32f3xx_hal_uart.h"
 #include <stdint.h>
+#include <stdio.h>
 
 #define BUFFERSIZE 64
 

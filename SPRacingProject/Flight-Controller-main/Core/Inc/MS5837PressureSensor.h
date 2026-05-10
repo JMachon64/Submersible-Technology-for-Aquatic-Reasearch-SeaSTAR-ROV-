@@ -10,10 +10,12 @@
 
 #include "main.h"
 #include "stm32f3xx_hal_i2c.h"
+#include "stm32f3xx.h"
 
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
+
 
 /* 
  * 
