@@ -168,6 +168,31 @@
  border-bottom:1px solid rgba(255,255,255,.10);
  }
 
+ .topbar-right{
+ display:flex;
+ align-items:center;
+ justify-content:flex-end;
+ gap:10px;
+ flex-wrap:wrap;
+}
+
+.state-display,
+.pill{
+ min-height:48px;
+ height:48px;
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+}
+
+.pill{
+ min-width:170px;
+}
+
+.state-display{
+ min-width:210px;
+}
+
  .pill{
  display:inline-flex; align-items:center; gap:10px;
  padding:10px 14px;
@@ -301,7 +326,29 @@
  display:grid;
  grid-template-columns: 1fr 1fr;
  gap:12px;
+}
+
+#missionBtn{
+ grid-column:1 / -1;
+ min-height:64px;
+ font-size:15px;
+}
+
+#waterSampleBtn,
+#downloadCsvBtn{
+ min-height:56px;
+ font-size:14px;
+}
+
+@media (max-width:520px){
+ .controls-grid{
+  grid-template-columns:1fr;
  }
+
+ #missionBtn{
+  grid-column:auto;
+ }
+}
 
  .controls-grid .mission-btn,
  .controls-grid .water-btn{
@@ -601,6 +648,15 @@
  0 0 55px rgba(42,167,255,.20);
  transition: box-shadow .25s ease;
  }
+
+ .app-shell.danger-halo,
+ .panel.danger-halo,
+ .card.danger-halo{
+ box-shadow:
+ 0 18px 60px rgba(255,77,95,.35),
+ 0 0 60px rgba(255,77,95,.28);
+ border-color: rgba(255,77,95,.35);
+ }
  
 </style>
 </head>
@@ -661,6 +717,7 @@
       <div class="controls-grid">
        <button class="mission-btn mission-start" id="missionBtn">Start Mission</button>
        <button class="water-btn" id="waterSampleBtn">Collect Water Sample</button>
+       <button class="water-btn" id="downloadCsvBtn">Download Telemetry CSV</button>
       </div>
      </section>
 
@@ -686,14 +743,14 @@
          <span class="num" id="tempBig">—</span><span class="unit">°C</span>
         </div>
        </div>
-
+       
        <div class="bubble">
         <div class="meta">
          <span class="dotIcon c-purple"></span>
          <span class="tag">Pressure</span>
         </div>
         <div>
-         <span class="num" id="pressBig">—</span><span class="unit">bar</span>
+         <span class="num" id="pressBig">—</span><span class="unit">atm</span>
         </div>
        </div>
 
@@ -805,6 +862,10 @@
  let cmdVelTopic = null; //publishes movement commands from browser controller input. (dont know if i need this ask alex)
  let uiControllerTopic = null; //publishes controller event logs from browser.
  let gamepadLoopStarted = false; //makes sure we only start the controller polling loop once.
+ 
+ const CONTROLLER_SEND_HZ = 60; //60 hz.
+ const CONTROLLER_SEND_INTERVAL_MS = 1000 / CONTROLLER_SEND_HZ; //60 hz is abt 16.67 ms.
+ let lastControllerSendTime = 0; //stores last time we sent controller data.
 
  let missionActive = false; //mission active starts at false (state of "mission active")
  let telemetryActive = false; //telemetry is not active.
@@ -819,6 +880,11 @@
  let recordingTimerInterval = null;
 
  let thrusterCommandTopic = null;
+
+
+ let leakAlarm = new Audio("mixkit-classic-alarm-995.wav");
+ leakAlarm.loop = true;
+ leakAlarm.volume = 0.9;
 
  const loginScreen = document.getElementById("loginScreen"); 
  const app = document.getElementById("app");
@@ -931,7 +997,7 @@
 
  if (!connText || !connPill) return;
 
- if (ok){
+ if (ok){ 
   connPill.style.borderColor = "rgba(30,227,138,.22)";
   connPill.style.background = "rgba(30,227,138,.08)";
   connText.textContent = "Connected";
@@ -939,6 +1005,7 @@
   if (missionBtn) missionBtn.disabled = false;
   if (waterSampleBtn) waterSampleBtn.disabled = false;
  } 
+
  else {
   connPill.style.borderColor = "rgba(255,77,95,.22)";
   connPill.style.background = "rgba(255,77,95,.08)";
@@ -963,43 +1030,50 @@
  return Math.round(combined * 1000); //his logic. (but multiply by 1000, to not have floats.)
 }
 //------------------------------------------------------------------
-
 function startGamepadLoop(){
   if (gamepadLoopStarted) return;
   gamepadLoopStarted = true;
-  appendLog("Browser controller input enabled.");
+  //appendLog("Browser controller input enabled.");
   requestAnimationFrame(gamepadLoop);
 }
 
-function gamepadLoop(){
+function gamepadLoop(timestamp){
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   const gp = gamepads[0];
 
   if (gp){
-    handleGamepadInput(gp);
+    const timeSinceLastSend = timestamp - lastControllerSendTime;
+
+    if (timeSinceLastSend >= CONTROLLER_SEND_INTERVAL_MS){
+      handleGamepadInput(gp);
+      lastControllerSendTime = timestamp;
+    }
   }
 
   requestAnimationFrame(gamepadLoop);
 }
-
 //------------------------------------------------------------------
- function sendMissionCommand(command){
- if (!missionControlTopic){
- appendLog("Mission command not sent: ROS publisher not ready.");
- return;
- }
+function sendMissionCommand(command){
+  if (!missionControlTopic){
+    //appendLog("Mission command not sent: ROS publisher not ready.");
+    return;
+  }
+  const timestamp = Date.now();
 
- const msg = new ROSLIB.Message({
- data: command
- });
+  const msg = new ROSLIB.Message({ 
+    data: command 
+  });
 
- missionControlTopic.publish(msg);
- appendLog("Sent mission command: " + command);
- }
+  missionControlTopic.publish(msg);
+
+  appendLog("Sent mission command: " + msg.data);
+
+  console.log("Sent:", msg.data);
+}
 
  function publishControllerEvent(text){
  if (!uiControllerTopic){
-  appendLog("Controller event not sent: UI controller publisher not ready.");
+  //appendLog("Controller event not sent: UI controller publisher not ready.");
   return;
  }
  const msg = new ROSLIB.Message({
@@ -1009,12 +1083,12 @@ function gamepadLoop(){
  uiControllerTopic.publish(msg);
  }
 
-
  function handleMissionButton(){
  if (!missionControlTopic){
-  appendLog("Mission publisher still not ready.");
+  //appendLog("Mission publisher still not ready.");
   return;
  }
+
  if (missionActive){
   console.log("Mission Ended");
   appendLog("Mission Ended");
@@ -1041,7 +1115,11 @@ function gamepadLoop(){
  sendMissionCommand("COLLECT_WATER_SAMPLE");
  publishControllerEvent("UI: COLLECT_WATER_SAMPLE pressed");
 }
-
+ function handleDownloadCsvButton(){
+ appendLog("Downloading telemetry CSV...");
+ window.open("http://192.168.2.2:8000/telemetry_latest.csv", "_blank");
+ 
+}
  function bindUI(){
  updateStateDisplay();
  updateMissionButton();
@@ -1059,6 +1137,12 @@ function gamepadLoop(){
   waterSampleBtn.dataset.bound = "1";
   waterSampleBtn.disabled = true;
  }
+
+ const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+ if (downloadCsvBtn && !downloadCsvBtn.dataset.bound){
+ downloadCsvBtn.addEventListener("click", handleDownloadCsvButton);
+ downloadCsvBtn.dataset.bound = "1";
+}
  }
 
 //--------------------------------------------------------------------------------
@@ -1090,7 +1174,7 @@ function handleGamepadInput(gp){
  const z = getTriggerThrust(gp);
 
  console.log("LX:", lx, "LY:", ly, "RX:", rx, "RY:", ry, "Z:", z);
- appendLog("ARRAY: [" + lx + ", " + ly + ", " + rx + ", " + ry + ", " + z + "]");
+ //appendLog("ARRAY: [" + lx + ", " + ly + ", " + rx + ", " + ry + ", " + z + "]");
 
  if (thrusterCommandTopic){
   const thrusterMsg = new ROSLIB.Message({
@@ -1164,7 +1248,7 @@ function handleGamepadInput(gp){
  prevTelemetryCombo = telemetryComboNow;
 
  if (buttons[X_BUTTON] === 1 && prevButtons[X_BUTTON] === 0){
-  appendLog("Controller: COLLECT_WATER_SAMPLE pressed");
+  //appendLog("Controller: COLLECT_WATER_SAMPLE pressed");
   sendMissionCommand("COLLECT_WATER_SAMPLE");
   publishControllerEvent("Controller: COLLECT_WATER_SAMPLE pressed");
  }
@@ -1175,6 +1259,7 @@ function handleGamepadInput(gp){
    publishControllerEvent("Controller: START_RECORDING_VIDEO pressed");
    startRecordingUI();
   }
+
   else {
    sendMissionCommand("STOP_RECORDING_VIDEO");
    publishControllerEvent("Controller: STOP_RECORDING_VIDEO pressed");
@@ -1182,17 +1267,38 @@ function handleGamepadInput(gp){
   }
  }
 
+if (buttons[B_BUTTON] === 1 && !prevButtons[B_BUTTON]) {
+  sendMissionCommand("LEAK_DETECTED");
+  publishControllerEvent("Leak was pressed");
+  currentState = "Failure";
+  missionActive = false;
+  updateStateDisplay();
+  updateMissionButton();
+  document.querySelector(".app-shell").classList.add("danger-halo");
+  document.querySelectorAll(".panel, .card").forEach(el => {
+    el.classList.add("danger-halo");
+  });
+  leakAlarm.currentTime = 0;
+  leakAlarm.play().catch(() => {
+    //appendLog("Audio blocked until user interacts");
+  });
+
+  //appendLog("Controller button B simulated leak: UI switched to FAILURE state.");
+}
+
  prevButtons = buttons;
 }
 
  window.addEventListener("gamepadconnected", (e) => { //if controller is connected then it lets us know.
- appendLog("Controller connected: " + e.gamepad.id);
+ appendLog("Controller connected: ");
  startGamepadLoop();
  });
 
  window.addEventListener("gamepaddisconnected", (e) => {
-  appendLog("Controller disconnected: " + e.gamepad.id);
+  appendLog("Controller disconnected: ");
  });
+
+
 //--------------------------------------------------------------------------------
  function unlockUI(){ //hides the login screen.
  loginScreen.style.display = "none";
@@ -1232,8 +1338,14 @@ function startRos(){
   messageType: "std_msgs/Int16MultiArray"
  });
 
+ const leakSub = new ROSLIB.Topic({
+  ros: ros,
+  name: "/sensors/leak",
+  messageType: "std_msgs/Bool"
+});
+
  thrusterCommandTopic.advertise();
- appendLog("Advertised /thruster/commands");
+ //appendLog("Advertised /thruster/commands");
  console.log("Advertised /thruster/commands");
 
  cmdVelTopic = new ROSLIB.Topic({ //get rid of this me thinks.
@@ -1309,23 +1421,36 @@ function startRos(){
  });
 
  //subscribe to mission/control so the UI can react to commands too.
- missionCommandSub.subscribe((msg) => {
-  const command = msg.data.trim().toUpperCase();
-  appendLog("Mission command received: " + command);
+missionCommandSub.subscribe((msg) => {
+//This is for testing latency UI -> ROS -> UI.
+ const receiveTime = Date.now(); //time in milliseconds, gets current time when UI receives message.
+ const parts = msg.data.split(","); //split incoming message into 2 parts.
+ const command = parts[0].trim().toUpperCase(); //extract mission command.
+ const sendTime = parts.length > 1 ? Number(parts[1]) : null; //extract time stamp.
+ //appendLog("Mission command received: " + command); //logs that command was received.
+ if (sendTime){ //if timestamp exists, calculate latency.
+  const latency = receiveTime - sendTime; //latency = time received - time sent.
+  //appendLog("Latency for " + command + ": " + latency + " ms"); //logs latency to UI log panel.
 
-  if (command === "START_RECORDING_VIDEO"){
-   startRecordingUI();
-  }
-  else if (command === "STOP_RECORDING_VIDEO"){
-   stopRecordingUI();
-  }
- });
+
+  // also print to browser console
+  console.log("Latency for", command, latency, "ms");
+ }
+
+ if (command === "START_RECORDING_VIDEO"){
+  startRecordingUI(); 
+ }
+ else if (command === "STOP_RECORDING_VIDEO"){
+  stopRecordingUI(); 
+ }
+
+});
 
  missionStateSub.subscribe((msg) => {
   const incomingState = msg.data.trim().toUpperCase();
 
   if (
-   incomingState === "MISSION MODE" ||
+   incomingState === "MISSION MODE" || 
    incomingState === "MISSION" ||
    incomingState === "START_MISSION"
   ){
@@ -1336,14 +1461,33 @@ function startRos(){
    incomingState === "IDLE" ||
    incomingState === "BOOT" ||
    incomingState === "END_MISSION"
+   
   ){
    currentState = incomingState === "BOOT" ? "BOOT" : "IDLE";
    missionActive = false;
+  leakAlarm.pause();
+  leakAlarm.currentTime = 0;
+
+  document.querySelector(".app-shell").classList.remove("danger-halo");
+  document.querySelectorAll(".panel, .card").forEach(el => {
+  el.classList.remove("danger-halo");
+});
   }
   else if (incomingState === "FAILURE"){
-   currentState = "Failure";
-   missionActive = false;
-  }
+  currentState = "Failure";
+  missionActive = false;
+
+  appendLog("LEAK DETECTED - EMERGENCY STOP");
+
+  document.querySelector(".app-shell").classList.add("danger-halo");
+  document.querySelectorAll(".panel, .card").forEach(el => {
+  el.classList.add("danger-halo");
+ });
+
+ leakAlarm.play().catch(() => {
+  //appendLog("Audio blocked until user interacts");
+ });
+ }
   else {
    currentState = msg.data.trim();
   }
@@ -1376,6 +1520,39 @@ function startRos(){
   setText("headingSmall", hh);
  });
 
+ leakSub.subscribe((msg) => {
+  const leakDetected = msg.data;
+
+  if (leakDetected){
+    appendLog("LEAK DETECTED");
+
+    currentState = "Failure";
+    missionActive = false;
+
+    updateStateDisplay();
+    updateMissionButton();
+
+
+    document.querySelector(".app-shell").classList.add("danger-halo");
+    document.querySelectorAll(".panel, .card").forEach(el => {
+      el.classList.add("danger-halo");
+    });
+    leakAlarm.play().catch(() => {
+      //appendLog("Audio blocked until user interacts");
+    });
+  }
+  else {
+    appendLog("Leak cleared");
+
+    document.querySelector(".app-shell").classList.remove("danger-halo");
+    document.querySelectorAll(".panel, .card").forEach(el => {
+      el.classList.remove("danger-halo");
+    });
+    leakAlarm.pause();
+    leakAlarm.currentTime = 0;
+  }
+});
+
  voltSub.subscribe((msg) => {
   setText("voltBig", msg.data.toFixed(1));
  });
@@ -1385,13 +1562,13 @@ function startRos(){
  });
 
  controllerLogTopic.subscribe((msg) => {
-  appendLog(msg.data);
+  //appendLog(msg.data);
  });
 
  // THEN do connection handlers
  ros.on("connection", () => {
   setConnectedUI(true);
-  appendLog("Connected to ROS bridge.");
+  //appendLog("Connected to ROS bridge.");
   console.log("Connected to ROS bridge.");
 
  try {
@@ -1404,11 +1581,11 @@ function startRos(){
   });
 
   thrusterCommandTopic.publish(testMsg);
-  appendLog("Published test to /thruster/commands");
+  //appendLog("Published test to /thruster/commands");
   console.log("Published test to /thruster/commands");
 } catch (err) {
   console.error("Thruster publish failed:", err);
-  appendLog("Thruster publish failed: " + err);
+  //appendLog("Thruster publish failed: " + err);
 }
 
   startGamepadLoop();
@@ -1419,6 +1596,7 @@ ros.on("close", () => {
   appendLog("ROS bridge connection closed.");
 });
 }
+
  </script>
  </body>
 </html>
