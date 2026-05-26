@@ -199,9 +199,9 @@ void MX_FREERTOS_Init(void) {
 
    //SamplingTaskHandle = osThreadNew(StartSamplingTask, NULL, &SamplingTask_attributes);
    UartStreamTaskHandle      = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
-   StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
-   SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
-  //  TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
+   //StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
+  // SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
+   //TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
    PropulsionTaskHandle      = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
 
   /* USER CODE END RTOS_THREADS */
@@ -326,12 +326,13 @@ void Propulsion_Task(void *argument){
   PWM_Init();
   PWM_SampleClosedPosition();
   Control_Update_Command(0,0,0,0,0);
+  Init_TSYS01(&temp_sensor, &hi2c1);
+  Init_MS5837(&pressure_sensor, &hi2c1);
 
   printf("\r\n");
   printf("|Sensor and Propulsion Task has been initialized...|\r\n");
   printf("\r\n");
-  // Init_TSYS01(&temp_sensor, &hi2c1);
-  // Init_MS5837(&pressure_sensor, &hi2c1);
+
   acs37800_t currentSensor = {
     .divRes = 2000000,
     .i2c_address = 0x60,
@@ -350,8 +351,6 @@ void Propulsion_Task(void *argument){
   float voltage = 0;
 
   HMC5883L_Configure();
-  Init_TSYS01(&temp_sensor, &hi2c1);
-  Init_MS5837(&pressure_sensor, &hi2c1);
 
 
 
@@ -375,16 +374,16 @@ void Propulsion_Task(void *argument){
   FusionMatrix softIronMatrix = {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
   FusionVector hardIronOffset = {{0.0f, 0.0f, 0.0f}};
 
-  // for(int i = 0; i < 10; i++){
-  //   MPU6050_Read_All(&mpu_data);
-  //   gyroscopeOffset.axis.x += mpu_data.Gx;
-  //   gyroscopeOffset.axis.y += mpu_data.Gy;
-  //   gyroscopeOffset.axis.z += mpu_data.Gz;
-  //   osDelay(100);
-  // }
-  // gyroscopeOffset.axis.x /= 10.0;
-  // gyroscopeOffset.axis.y /= 10.0;
-  // gyroscopeOffset.axis.z /= 10.0;
+  for(int i = 0; i < 10; i++){
+    MPU6050_Read_All(&mpu_data);
+    gyroscopeOffset.axis.x += mpu_data.Gx;
+    gyroscopeOffset.axis.y += mpu_data.Gy;
+    gyroscopeOffset.axis.z += mpu_data.Gz;
+    osDelay(100);
+  }
+  gyroscopeOffset.axis.x /= 10.0;
+  gyroscopeOffset.axis.y /= 10.0;
+  gyroscopeOffset.axis.z /= 10.0;
 
     // Instantiate AHRS algorithm
   FusionAhrs ahrs;
@@ -418,16 +417,16 @@ void Propulsion_Task(void *argument){
 
   while(1){
 
-      // if (sensorsampleflag)
-      // {
-      //     sensorsampleflag = 0;
+      if (sensorsampleflag)
+      {
+          sensorsampleflag = 0;
 
-      //     Read_TSYS01(&temp_sensor);
-      //     Read_MS5837(&pressure_sensor);
-      // }
+          Read_TSYS01(&temp_sensor);
+          Read_MS5837(&pressure_sensor);
+      }
 
 
-   //MPU6050_Read_All(&mpu_data);
+   MPU6050_Read_All(&mpu_data);
   if (hi2c1.ErrorCode != HAL_I2C_ERROR_NONE)
   {
 
@@ -467,10 +466,10 @@ void Propulsion_Task(void *argument){
 
     // Print AHRS outputs
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-    //const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
-    // printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
-    //         euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
-    //         earth.axis.x, earth.axis.y, earth.axis.z);
+    const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
+    printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
+            euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
+            earth.axis.x, earth.axis.y, earth.axis.z);
     
     // SEND THE EULER ANGLES AS A PACKET //
     

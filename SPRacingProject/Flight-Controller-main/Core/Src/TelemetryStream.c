@@ -17,11 +17,11 @@ void TelemetryStream_SendEnvironmental(environmental_packet_t *Data)
 {
     environmetal_telemetry_packet.timestamp_ms = HAL_GetTick();
     
-    printf("TEMP: %ld, DEPTH:  %ld, PRESSURE_PA: %ld, TIME: %ld\r\n",
-         Data -> temp,
-         Data -> depth,
-         Data -> pressure_Pa,  
-         Data -> timestamp_ms);
+    // printf("TEMP: %ld, DEPTH:  %ld, PRESSURE_PA: %ld, TIME: %ld\r\n",
+    //      Data -> temp,
+    //      Data -> depth,
+    //      Data -> pressure_Pa,  
+    //      Data -> timestamp_ms);
 
     Protocol_SendPacket(sizeof(environmental_packet_t), ID_ENVIRONMENTAL_TELEMETRY,  &environmetal_telemetry_packet);
 
