@@ -7,13 +7,11 @@
  
 #include "ControlLoop.h"
 
-
 volatile control_command_t thruster_command = {0};
 
 uint16_t joystick_periods[5];
 
-
-volatile uint8_t thrusters_disabled = true;
+volatile uint8_t thrusters_disabled = 1;
 
 uint8_t Control_Update_Command(int16_t x1, int16_t y1, int16_t x2, int16_t y2, 
     int16_t trigger)

@@ -229,7 +229,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         environmentalcounter++;
         powercounter++;
         
-        if (sensorcounter >= 60) {
+        if (sensorcounter >= 200) {
             sensorsampleflag = 1;
             sensorcounter = 0;
         }
@@ -244,7 +244,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             powercounter = 0;
         }
 
-        if (environmentalcounter >= 100) {
+        if (environmentalcounter >= 210) {
             environmentalsampleflag = 1;
             environmentalcounter = 0;
         }

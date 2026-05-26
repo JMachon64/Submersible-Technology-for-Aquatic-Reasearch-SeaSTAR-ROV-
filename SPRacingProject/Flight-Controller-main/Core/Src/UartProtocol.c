@@ -10,6 +10,7 @@
 #include "MS5837PressureSensor.h"
 #include "PacketIDs.h"
 #include "stm32f3xx_hal.h"
+#include <stdbool.h>
 
 typedef struct {
     uint8_t len;
@@ -208,7 +209,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
                 break;
             }
 
-            printf("GOT HELLO\n");
+            // printf("GOT HELLO\n");
             uint32_t acknowlegdment_timestamp_ms = HAL_GetTick();
 
 
@@ -253,7 +254,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
                 printf("Bad ping packet length: %u\r\n", packet->len);
                 break;
             }
-            printf("RESPONDING\n");
+       
             Protocol_SendPacket(4, ID_PONG, packet->payLoad);
             last_heartbeat = HAL_GetTick();
 
@@ -283,12 +284,6 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             int16_t y2      = (int16_t)(((uint16_t)packet->payLoad[6]) | ((uint16_t)packet->payLoad[7] << 8));
             int16_t trigger = (int16_t)(((uint16_t)packet->payLoad[8]) | ((uint16_t)packet->payLoad[9] << 8));
 
-            if (x1>100){
-                printf("%d\n", x1);
-            }
-            if (x1<-100){
-                printf("LEFT\n");
-    }
             //Apply command
             Control_Update_Command(x1, y1, x2, y2, trigger);
             break;

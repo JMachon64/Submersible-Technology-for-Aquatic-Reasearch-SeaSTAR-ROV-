@@ -7,6 +7,7 @@
 
 #include "LeakDetection.h"
 #include "UartProtocol.h"
+#include <stdbool.h>
 
 #define LEAK_SENSOR_PORT GPIOB
 #define LEAK_SENSOR_PIN  GPIO_PIN_5
@@ -18,7 +19,7 @@ void LeakSensor_Read(void)
 {
     if (leakInterruptFlag)
         {
-            leakInterruptFlag = 0;
+            leakInterruptFlag = false;
 
             if (!leakLatched)
             {

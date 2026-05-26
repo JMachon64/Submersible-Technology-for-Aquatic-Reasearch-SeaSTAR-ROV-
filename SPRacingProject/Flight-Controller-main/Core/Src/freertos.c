@@ -134,7 +134,7 @@ const osThreadAttr_t SystemHealthMonitorTask_attributes = {
 osThreadId_t PropulsionTaskHandle;
 const osThreadAttr_t PropulsionTask_attributes = {
   .name = "PropulsionTask",
-  .stack_size = 2048  * 4,
+  .stack_size = 4094  * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 
@@ -201,11 +201,13 @@ void MX_FREERTOS_Init(void) {
    UartStreamTaskHandle      = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
    StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
    SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
-  // TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
+  //  TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
    PropulsionTaskHandle      = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
 
   /* USER CODE END RTOS_THREADS */
-
+  if(StateMachineTaskHandle ==  NULL){
+    printf("STATE MACHINE FAILED \n");
+  }
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
@@ -328,7 +330,8 @@ void Propulsion_Task(void *argument){
   printf("\r\n");
   printf("|Sensor and Propulsion Task has been initialized...|\r\n");
   printf("\r\n");
-
+  // Init_TSYS01(&temp_sensor, &hi2c1);
+  // Init_MS5837(&pressure_sensor, &hi2c1);
   acs37800_t currentSensor = {
     .divRes = 2000000,
     .i2c_address = 0x60,
@@ -372,16 +375,16 @@ void Propulsion_Task(void *argument){
   FusionMatrix softIronMatrix = {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
   FusionVector hardIronOffset = {{0.0f, 0.0f, 0.0f}};
 
-  for(int i = 0; i < 10; i++){
-    MPU6050_Read_All(&mpu_data);
-    gyroscopeOffset.axis.x += mpu_data.Gx;
-    gyroscopeOffset.axis.y += mpu_data.Gy;
-    gyroscopeOffset.axis.z += mpu_data.Gz;
-    osDelay(100);
-  }
-  gyroscopeOffset.axis.x /= 10.0;
-  gyroscopeOffset.axis.y /= 10.0;
-  gyroscopeOffset.axis.z /= 10.0;
+  // for(int i = 0; i < 10; i++){
+  //   MPU6050_Read_All(&mpu_data);
+  //   gyroscopeOffset.axis.x += mpu_data.Gx;
+  //   gyroscopeOffset.axis.y += mpu_data.Gy;
+  //   gyroscopeOffset.axis.z += mpu_data.Gz;
+  //   osDelay(100);
+  // }
+  // gyroscopeOffset.axis.x /= 10.0;
+  // gyroscopeOffset.axis.y /= 10.0;
+  // gyroscopeOffset.axis.z /= 10.0;
 
     // Instantiate AHRS algorithm
   FusionAhrs ahrs;
@@ -415,17 +418,16 @@ void Propulsion_Task(void *argument){
 
   while(1){
 
+      // if (sensorsampleflag)
+      // {
+      //     sensorsampleflag = 0;
 
-  //START BY READING THE TELEMETRY SENSORS
-  if (sensorsampleflag)
-      {
-          sensorsampleflag = 0;
+      //     Read_TSYS01(&temp_sensor);
+      //     Read_MS5837(&pressure_sensor);
+      // }
 
-          Read_TSYS01(&temp_sensor);
-          Read_MS5837(&pressure_sensor);
-    }
 
-   MPU6050_Read_All(&mpu_data);
+   //MPU6050_Read_All(&mpu_data);
   if (hi2c1.ErrorCode != HAL_I2C_ERROR_NONE)
   {
 
@@ -465,7 +467,7 @@ void Propulsion_Task(void *argument){
 
     // Print AHRS outputs
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-    const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
+    //const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
     // printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
     //         euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
     //         earth.axis.x, earth.axis.y, earth.axis.z);
@@ -514,23 +516,35 @@ void Propulsion_Task(void *argument){
       float currentScalar = -0.2*(current-30.0);
       if(currentScalar < 0) currentScalar = 0;
       
-      t1 = 1500 + currentScalar*(thruster_command.joystick1x/2.0);
-      t2 = 1500 + currentScalar*(thruster_command.joystick1y/2.0);
+      t1 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
+      t2 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
       t3 = 1500 + currentScalar*(PWM_GetPeriod(PWM_3) - 1500 + pitchCorrection - rollCorrection + depthCorrection);
       t4 = 1500 + currentScalar*(PWM_GetPeriod(PWM_4) - 1500  + pitchCorrection + rollCorrection + depthCorrection);
       t5 = 1500 + currentScalar*(PWM_GetPeriod(PWM_5) - 1500 - pitchCorrection + depthCorrection);
     }else {
-      t1 = (thruster_command.joystick1x/2.0)+1500;
-      t2 = (thruster_command.joystick1y/2.0)+1500;
+      t1 = (thruster_command.joystick1y/2.0) + (thruster_command.joystick1x/2.0) +1500;
+      t2 = (thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0) +1500;
       t3 = PWM_GetPeriod(PWM_3) + pitchCorrection - rollCorrection + depthCorrection;
       t4 = PWM_GetPeriod(PWM_4) + pitchCorrection + rollCorrection + depthCorrection;
       t5 = PWM_GetPeriod(PWM_5) - pitchCorrection + depthCorrection;
     }
 
+    if(t1>2000)t1=2000;
+    if(t2>2000)t2=2000;
+    if(t3>2000)t3=2000;
+    if(t4>2000)t4=2000;
+    if(t5>2000)t5=2000;
 
+    if(t1<1500)t1=1500;
+    if(t2<1500)t2=1500;
+    if(t3<1500)t3=1500;
+    if(t4<1500)t4=1500;
+    if(t5<1500)t5=1500;
+
+    // printf("%d, %d, %d, %d, %d\n", t1,t2,t3,t4,t5);
     PWM_SetThrusterPeriods(t1,t2,t3,t4,t5);
 
-    osDelay(10); // small consistent loop rate
+    osDelay(50); // small consistent loop rate
 
     }
 }
@@ -556,15 +570,11 @@ void StartTelemetryStreamTask(void *argument)
     
   for (;;)
   {
-      if (sensorsampleflag)
-      {
-          sensorsampleflag = 0;
 
-          Read_TSYS01(&temp_sensor);
-          Read_MS5837(&pressure_sensor);
-      }
+      Read_TSYS01(&temp_sensor);
+      Read_MS5837(&pressure_sensor);
 
-      osDelay(1);
+      osDelay(200);
   }
 }
 

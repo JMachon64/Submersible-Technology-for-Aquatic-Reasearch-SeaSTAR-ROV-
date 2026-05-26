@@ -49,7 +49,7 @@ uint8_t SeaSTAR_FSM(void)
 
                 starfystate = MISSION_MODE_IDLE;
 
-                printf("Transition: BOOT -> IDLE\r\n");
+                printf("Transition: [BOOT] -> [IDLE]\r\n");
 
                 thrusters_disabled = true;
 
@@ -59,7 +59,7 @@ uint8_t SeaSTAR_FSM(void)
             else if (event == FSM_EVENT_LEAK_DETECTED)
             {
                 starfystate = FAILURE_MODE;
-                printf("Transition: [IDLE] -> [FAILURE]: LEAK DETECTED\r\n");
+                printf("Transition: [FAILURE] -> [FAILURE]: LEAK DETECTED\r\n");
                 break;
             }
             break;
