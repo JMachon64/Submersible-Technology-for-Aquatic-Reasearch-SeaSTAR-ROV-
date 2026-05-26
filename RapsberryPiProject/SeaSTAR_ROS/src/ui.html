@@ -750,6 +750,44 @@
  background: linear-gradient(180deg, transparent, rgba(0,0,0,.28));
 }
 
+.hacker-log-card{
+ margin-top:16px;
+ border:1px solid rgba(30,227,138,.55);
+ background:
+  linear-gradient(180deg, rgba(0,255,100,.06), rgba(0,0,0,.28)),
+  rgba(0,0,0,.35);
+ box-shadow:
+  0 0 22px rgba(30,227,138,.25),
+  0 0 45px rgba(30,227,138,.12);
+}
+
+.hacker-label{
+ color:rgba(30,227,138,.95);
+ font-family:"Courier New", monospace;
+ text-shadow:0 0 10px rgba(30,227,138,.55);
+}
+
+.hacker-log{
+ color:#1ee38a;
+ font-family:"Courier New", monospace;
+ font-size:14px;
+ font-weight:700;
+ letter-spacing:.03em;
+ background:
+  repeating-linear-gradient(
+   180deg,
+   rgba(30,227,138,.04) 0px,
+   rgba(30,227,138,.04) 1px,
+   transparent 1px,
+   transparent 4px
+  ),
+  rgba(0,0,0,.55);
+ border:1px solid rgba(30,227,138,.35);
+ box-shadow:inset 0 0 22px rgba(30,227,138,.12);
+ text-shadow:0 0 8px rgba(30,227,138,.65);
+ max-height:210px;
+}
+
 @media (max-width:1080px){
  .grid{
   grid-template-columns:1fr;
@@ -834,11 +872,42 @@
  0 0 60px rgba(255,77,95,.28);
  border-color: rgba(255,77,95,.35);
 }
+
+#controllerLog{
+ color:#1ee38a !important;
+ font-family:"Courier New", monospace !important;
+ text-shadow:0 0 8px rgba(30,227,138,.75) !important;
+}
+
+#controllerLog.hacker-log{
+ color:#1ee38a !important;
+}
+
+.hacker-log-card .label{
+ color:#1ee38a !important;
+}
  
 </style>
 </head>
 
 <body> 
+
+ <div id="missionFormPopup" class="login" style="display:none;">
+  <div class="login-card">
+   <h2>Pre-Mission Form</h2>
+   <p>Enter mission information before starting.</p>
+
+   <input id="pilotNameInput" type="text" placeholder="Full name">
+   <input id="missionNameInput" type="text" placeholder="Mission name">
+   <input id="coordinatesInput" type="text" placeholder="Coordinates / Position">
+
+   <button id="submitMissionFormBtn">Start Mission</button>
+   <button id="cancelMissionFormBtn" style="margin-top:10px;">Cancel</button>
+
+   <div class="login-msg" id="missionFormMsg"></div>
+  </div>
+ </div>
+
  <div class="login" id="loginScreen">
   <div class="login-card">
    <div class="login-top">
@@ -898,7 +967,6 @@
        <button class="water-btn" id="lightBtn">Turn Light ON</button>
        <button class="water-btn" id="downloadCsvBtn">Download Telemetry CSV</button>
       </div>
-
      </section>
 
      <div class="monitor-tabs">
@@ -907,7 +975,6 @@
      </div>
 
      <div class="tab-content active" id="sensorPowerContent">
-
       <section class="panel bottom">
        <h2>Sensor + Power Monitoring</h2>
 
@@ -976,11 +1043,9 @@
 
        </div>
       </section>
-
      </div>
 
      <div class="tab-content" id="positionContent">
-
       <section class="panel bottom">
        <h2>Position + Live Graphs</h2>
 
@@ -992,7 +1057,6 @@
         </div>
 
         <div class="graph-row">
-
          <div class="graph-card">
           <div class="graph-title">Depth Over Time</div>
           <canvas id="depthGraph"></canvas>
@@ -1002,30 +1066,17 @@
           <div class="graph-title">Temperature Over Time</div>
           <canvas id="tempGraph"></canvas>
          </div>
-
         </div>
 
        </div>
       </section>
-
-     </div>
-
-     <div class="card">
-      <div class="label">
-       <svg class="ico green" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M6 9h12M6 15h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <circle cx="8" cy="12" r="1.4" fill="currentColor"/>
-        <circle cx="16" cy="12" r="1.4" fill="currentColor"/>
-       </svg>
-       CONTROLLER EVENTS
-      </div>
-      <pre id="controllerLog" class="log">Waiting for controller input…</pre>
      </div>
 
     </div>
 
     <section class="panel video">
      <div class="video-inner">
+
       <div class="video-top">
        <div style="display:flex; align-items:center; gap:10px;">
         <div class="live"><span class="dot"></span>LIVE</div>
@@ -1054,6 +1105,19 @@
         <div>Video: <span id="videoStatus">Idle</span></div>
        </div>
       </div> 
+
+      <div class="card hacker-log-card">
+       <div class="label hacker-label">
+        <svg class="ico green" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+         <path d="M6 9h12M6 15h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+         <circle cx="8" cy="12" r="1.4" fill="currentColor"/>
+         <circle cx="16" cy="12" r="1.4" fill="currentColor"/>
+        </svg>
+        CONTROLLER EVENTS
+       </div>
+       <pre id="controllerLog" class="log hacker-log">Waiting for controller input…</pre>
+      </div>
+
      </div>
     </section>
 
@@ -1119,7 +1183,10 @@
  leakAlarm.volume = 0.9;
 
 
-let controllerStatusTopic = null;
+ let controllerStatusTopic = null;
+ let missionUserName = "";
+ let missionName = "";
+ let missionCoordinates = "";
 
  const loginScreen = document.getElementById("loginScreen"); 
  const app = document.getElementById("app");
@@ -1322,37 +1389,81 @@ function sendMissionCommand(command){
  uiControllerTopic.publish(msg);
  }
 
- function handleMissionButton(){
- if (!missionControlTopic){
-  //appendLog("Mission publisher still not ready.");
-  return;
- }
+ function cleanFileName(text){
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+}
 
- if (!missionActive && !controllerConnected){
-  console.log("Controller has not been connected!");
-  missionActive = false;
-  currentState = "IDLE";
-  return;
- }
- if (missionActive){
-  console.log("Mission Ended");
-  appendLog("Mission Ended");
-  sendMissionCommand("END_MISSION");
-  publishControllerEvent("UI: END_MISSION pressed");
-  missionActive = false;
-  currentState = "IDLE";
- } 
- else {
-  console.log("Mission Started");
+function openMissionForm(){
+  document.getElementById("missionFormPopup").style.display = "flex";
+}
+
+function closeMissionForm(){
+  document.getElementById("missionFormPopup").style.display = "none";
+}
+
+function handleMissionButton(){
+  if (!missionControlTopic){
+    return;
+  }
+
+  if (missionActive){
+    console.log("Mission Ended");
+    appendLog("Mission Ended");
+
+    sendMissionCommand("END_MISSION");
+    publishControllerEvent("UI: END_MISSION pressed");
+
+    missionActive = false;
+    currentState = "IDLE";
+
+    updateStateDisplay();
+    updateMissionButton();
+  } 
+  else {
+    openMissionForm();
+  }
+}
+
+function submitMissionForm(){
+  const pilotName = document.getElementById("pilotNameInput").value.trim();
+  const mission = document.getElementById("missionNameInput").value.trim();
+  const coordinates = document.getElementById("coordinatesInput").value.trim();
+  const msgBox = document.getElementById("missionFormMsg");
+
+  if (!pilotName || !mission || !coordinates){
+    msgBox.textContent = "Please fill out all fields.";
+    return;
+  }
+
+  missionUserName = cleanFileName(pilotName);
+  missionName = cleanFileName(mission);
+  missionCoordinates = coordinates;
+
+  const csvFileName = missionName + "_" + missionUserName + ".csv";
+
+  const missionData =
+    "START_MISSION" +
+    "|mission_name=" + missionName +
+    "|pilot_name=" + missionUserName +
+    "|coordinates=" + missionCoordinates +
+    "|csv_file=" + csvFileName;
+
+  sendMissionCommand(missionData);
+  publishControllerEvent("UI: START_MISSION pressed with pre-mission form");
+
   appendLog("Mission Started");
-  sendMissionCommand("START_MISSION");
-  publishControllerEvent("UI: START_MISSION pressed");
+  appendLog("CSV will save as: " + csvFileName);
+
   missionActive = true;
   currentState = "MISSION MODE";
- }
 
- updateStateDisplay();
- updateMissionButton();
+  closeMissionForm();
+  updateStateDisplay();
+  updateMissionButton();
 }
 
  function handleWaterSampleButton(){
@@ -1454,6 +1565,18 @@ function setupMonitorTabs(){
   lightBtn.dataset.bound = "1";
   lightBtn.disabled = true;
   updateLightButton();
+}
+
+const submitMissionFormBtn = document.getElementById("submitMissionFormBtn");
+if (submitMissionFormBtn && !submitMissionFormBtn.dataset.bound){
+  submitMissionFormBtn.addEventListener("click", submitMissionForm);
+  submitMissionFormBtn.dataset.bound = "1";
+}
+
+const cancelMissionFormBtn = document.getElementById("cancelMissionFormBtn");
+if (cancelMissionFormBtn && !cancelMissionFormBtn.dataset.bound){
+  cancelMissionFormBtn.addEventListener("click", closeMissionForm);
+  cancelMissionFormBtn.dataset.bound = "1";
 }
 
  const downloadCsvBtn = document.getElementById("downloadCsvBtn");
@@ -1648,6 +1771,12 @@ if (buttons[B_BUTTON] === 1 && !prevButtons[B_BUTTON]) {
   appendLog("Controller disconnected: ");
  });
 
+if (buttons[A_BUTTON] === 1 && prevButtons[A_BUTTON] === 0){
+  sendMissionCommand("TAKE_SCREENSHOT"); //send mission command to /mission/control.
+  //publishControllerEvent("Controller: TAKE_SCREENSHOT pressed");
+  appendLog("Screenshot command sent"); //prints UI log.
+}
+
 
 //--------------------------------------------------------------------------------
  function unlockUI(){ //hides the login screen.
@@ -1677,8 +1806,8 @@ if (buttons[B_BUTTON] === 1 && !prevButtons[B_BUTTON]) {
  setTimeout(() => loginCode.focus(), 50);
  }
 function startRos(){
- //ros = new ROSLIB.Ros({ url: "ws://localhost:9090" }); //kimmy wimmys beautiful microsoft surface studio pro.
- ros = new ROSLIB.Ros({ url: "ws://192.168.2.2:9090" }); //raspberry pi.
+ ros = new ROSLIB.Ros({ url: "ws://localhost:9090" }); //kimmy wimmys beautiful microsoft surface studio pro.
+ //ros = new ROSLIB.Ros({ url: "ws://192.168.2.2:9090" }); //raspberry pi.
 
  // create topics FIRST
   uiStatusTopic = new ROSLIB.Topic({
