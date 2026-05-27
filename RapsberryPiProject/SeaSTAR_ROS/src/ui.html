@@ -864,7 +864,7 @@
  transition: box-shadow .25s ease;
 }
 
-.app-shell.danger-halo,
+.app-shell.danger-halo, 
 .panel.danger-halo,
 .card.danger-halo{
  box-shadow:
@@ -1178,9 +1178,9 @@
  let lightActive = false; //the light starts off.
 
 
- let leakAlarm = new Audio("mixkit-classic-alarm-995.wav");
- leakAlarm.loop = true;
- leakAlarm.volume = 0.9;
+ let leakAlarm = new Audio("mixkit-classic-alarm-995.wav"); //name of the audio wave.
+ leakAlarm.loop = true; 
+ leakAlarm.volume = 0.9; //kinda loud.
 
 
  let controllerStatusTopic = null;
@@ -1333,7 +1333,7 @@
  if (Math.abs(combined) < 0.05){ //if combined is less than 0.05 just return 0.
   return 0;
  }
- return Math.round(combined * 1000); //his logic. (but multiply by 1000, to not have floats.)
+ return Math.round(combined * 100); //his logic. (but multiply by 1000, to not have floats.)
 }
 //------------------------------------------------------------------
 function startGamepadLoop(){
@@ -1640,13 +1640,39 @@ function handleGamepadInput(gp){
  const RIGHT_STICK_X = 2;
  const RIGHT_STICK_Y = 3;
 
- const lx = Math.round((gp.axes[LEFT_STICK_X] ?? 0) * 100);
- const ly = Math.round((gp.axes[LEFT_STICK_Y] ?? 0) * 100);
- const rx = Math.round((gp.axes[RIGHT_STICK_X] ?? 0) * 100);
- const ry = Math.round((gp.axes[RIGHT_STICK_Y] ?? 0) * 100);
- const z = getTriggerThrust(gp);
+ const lxRaw = gp.axes[LEFT_STICK_X] ?? 0;
+ const lyRaw = gp.axes[LEFT_STICK_Y] ?? 0;
+ const rxRaw = gp.axes[RIGHT_STICK_X] ?? 0;
+ const ryRaw = gp.axes[RIGHT_STICK_Y] ?? 0;
 
- console.log("LX:", lx, "LY:", ly, "RX:", rx, "RY:", ry, "Z:", z);
+ const triggerValue = getTriggerThrust(gp);
+
+console.log(
+  "Left X:", lxRaw.toFixed(2),
+  "Left Y:", lyRaw.toFixed(2),
+  "Right X:", rxRaw.toFixed(2),
+  "Right Y:", ryRaw.toFixed(2),
+  "Trigger:", triggerValue
+);
+
+const lx = Math.round(lxRaw * 100);
+const ly = Math.round(lyRaw * 100);
+const rx = Math.round(rxRaw * 100);
+const ry = Math.round(ryRaw * 100);
+const z = triggerValue;
+
+//  const LEFT_STICK_X = 0;
+//  const LEFT_STICK_Y = 1;
+//  const RIGHT_STICK_X = 2;
+//  const RIGHT_STICK_Y = 3;
+
+//  const lx = Math.round((gp.axes[LEFT_STICK_X] ?? 0) * 100);
+//  const ly = Math.round((gp.axes[LEFT_STICK_Y] ?? 0) * 100);
+//  const rx = Math.round((gp.axes[RIGHT_STICK_X] ?? 0) * 100);
+//  const ry = Math.round((gp.axes[RIGHT_STICK_Y] ?? 0) * 100);
+//  const z = getTriggerThrust(gp);
+
+//  console.log("LX:", lx, "LY:", ly, "RX:", rx, "RY:", ry, "Z:", z);
  //appendLog("ARRAY: [" + lx + ", " + ly + ", " + rx + ", " + ry + ", " + z + "]");
 
  if (thrusterCommandTopic){
@@ -1738,6 +1764,12 @@ function handleGamepadInput(gp){
    publishControllerEvent("Controller: STOP_RECORDING_VIDEO pressed");
    stopRecordingUI();
   }
+
+  if (buttons[A_BUTTON] === 1 && prevButtons[A_BUTTON] === 0){
+  sendMissionCommand("TAKE_SCREENSHOT"); //send mission command to /mission/control.
+  //publishControllerEvent("Controller: TAKE_SCREENSHOT pressed");
+  appendLog("Screenshot command sent"); //prints UI log.
+}
  }
 
 if (buttons[B_BUTTON] === 1 && !prevButtons[B_BUTTON]) {
@@ -1771,11 +1803,7 @@ if (buttons[B_BUTTON] === 1 && !prevButtons[B_BUTTON]) {
   appendLog("Controller disconnected: ");
  });
 
-if (buttons[A_BUTTON] === 1 && prevButtons[A_BUTTON] === 0){
-  sendMissionCommand("TAKE_SCREENSHOT"); //send mission command to /mission/control.
-  //publishControllerEvent("Controller: TAKE_SCREENSHOT pressed");
-  appendLog("Screenshot command sent"); //prints UI log.
-}
+
 
 
 //--------------------------------------------------------------------------------
@@ -1806,8 +1834,8 @@ if (buttons[A_BUTTON] === 1 && prevButtons[A_BUTTON] === 0){
  setTimeout(() => loginCode.focus(), 50);
  }
 function startRos(){
- ros = new ROSLIB.Ros({ url: "ws://localhost:9090" }); //kimmy wimmys beautiful microsoft surface studio pro.
- //ros = new ROSLIB.Ros({ url: "ws://192.168.2.2:9090" }); //raspberry pi.
+ //ros = new ROSLIB.Ros({ url: "ws://localhost:9090" }); //kimmy wimmys beautiful microsoft surface studio pro.
+ ros = new ROSLIB.Ros({ url: "ws://192.168.2.2:9090" }); //raspberry pi.
 
  // create topics FIRST
   uiStatusTopic = new ROSLIB.Topic({
