@@ -31,6 +31,8 @@ uint8_t Control_Update_Command(int16_t x1, int16_t y1, int16_t x2, int16_t y2,
     joystick_periods[2] = (x2/2.0)+1500;
     joystick_periods[3] = (y2/2.0)+1500;
     joystick_periods[4] = (trigger/2.0)+1500;
+
+    //printf("%d, %d, %d, %d, %d\n", x1,y1,x2,y2,trigger);
  
     return 1;
 }

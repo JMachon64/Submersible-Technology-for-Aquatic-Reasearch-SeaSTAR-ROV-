@@ -78,6 +78,7 @@ uint8_t SeaSTAR_FSM(void)
             if (event == FSM_EVENT_COLLECT_WATER_SAMPLE)
             {
                 return_state = MISSION_MODE_IDLE;
+                Control_Update_Command(0, 0, 0, 0, 0);
                 starfystate = COLLECT_WATER_SAMPLE_MODE;
 
                 break;
@@ -115,8 +116,9 @@ uint8_t SeaSTAR_FSM(void)
             }
             if (event == FSM_EVENT_COLLECT_WATER_SAMPLE)
             {
-
+                thrusters_disabled = true;
                 return_state = MISSION_MODE_ACTIVE;
+                Control_Update_Command(0, 0, 0, 0, 0);
                 starfystate = COLLECT_WATER_SAMPLE_MODE;
 
                 break;

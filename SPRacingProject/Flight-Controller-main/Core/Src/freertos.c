@@ -65,8 +65,8 @@ uint8_t uart2_rx_byte;
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define MAX_ROLL 30
-#define MAX_PITCH 30
+#define MAX_ROLL 30.0f
+#define MAX_PITCH 30.0f
 #define THRUSTER_SAMPLE_RATE 100
 
 
@@ -199,8 +199,8 @@ void MX_FREERTOS_Init(void) {
 
    //SamplingTaskHandle = osThreadNew(StartSamplingTask, NULL, &SamplingTask_attributes);
    UartStreamTaskHandle      = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
-   //StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
-  // SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
+   StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
+   SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
    //TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
    PropulsionTaskHandle      = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
 
@@ -391,7 +391,7 @@ void Propulsion_Task(void *argument){
 
   const FusionAhrsSettings settings = {
       .convention = FusionConventionNwu,
-      .gain = 0.5f,
+      .gain = 0.9f,
       .gyroscopeRange = 250.0f, /* replace with actual gyroscope range */
       .accelerationRejection = 10.0f,
       .magneticRejection = 10.0f,
@@ -446,7 +446,7 @@ void Propulsion_Task(void *argument){
     FusionVector accelerometer = {{mpu_data.Ax, mpu_data.Ay, mpu_data.Az}};
     FusionVector magnetometer = {{(float)(mag_data[0]), (float)(mag_data[1]), (float)(mag_data[2])}};
 
-    // printf("%f, %f, %f, %f, %f, %f\n", mpu_data.Ax, mpu_data.Ay, mpu_data.Az, mpu_data.Gx, mpu_data.Gy, mpu_data.Gz);
+    //printf("%f, %f, %f, %f, %f, %f\n", mpu_data.Ax, mpu_data.Ay, mpu_data.Az, mpu_data.Gx, mpu_data.Gy, mpu_data.Gz);
 
     // Apply calibration
     gyroscope = FusionModelInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
@@ -467,9 +467,9 @@ void Propulsion_Task(void *argument){
     // Print AHRS outputs
     const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
     const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
-    printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
-            euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
-            earth.axis.x, earth.axis.y, earth.axis.z);
+    // printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
+    //         euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
+    //         earth.axis.x, earth.axis.y, earth.axis.z);
     
     // SEND THE EULER ANGLES AS A PACKET //
     
@@ -478,29 +478,37 @@ void Propulsion_Task(void *argument){
     positional_telemetry_packet.roll = (int16_t)(euler.angle.roll * 100.0f);
 
 
-    float commandedRoll = thruster_command.joystick2x*MAX_ROLL;
-    float commandedPitch = thruster_command.joystick2y*MAX_PITCH;
+    float commandedRoll = thruster_command.joystick2x*MAX_ROLL/1000.0;
+    float commandedPitch = thruster_command.joystick2y*MAX_PITCH/1000.0;
 
-    float pitchError = commandedPitch - euler.angle.pitch;
-    float rollError = commandedRoll - euler.angle.roll;
-    float depthError = lastDepth - environmetal_telemetry_packet.depth;
+    float pitchError = commandedPitch - euler.angle.roll;
+    float rollError = commandedRoll - euler.angle.pitch;
+    float depthError = 0;
+
+   
 
 
-    if(thruster_command.trigger != 0){
-      lastDepth = environmetal_telemetry_packet.depth;
+    if(thruster_command.trigger == 0){
+      depthError = lastDepth - (float)environmetal_telemetry_packet.depth;
     }else{
-      lastDepth = environmetal_telemetry_packet.depth + thruster_command.trigger*environmetal_telemetry_packet.depth;
+      depthError = (float)(thruster_command.trigger);
     }
 
-    float pitchCoeff = 1.0;
-    float rollCoeff = 1.0;
-    float depthCoeff = 1.0;
+     printf("%f\n", depthError);
+
+
+
+    float pitchCoeff = 10.0;
+    float rollCoeff = 10.0;
+    float depthCoeff = 0.50;
 
 
 
     float pitchCorrection = pitchCoeff*pitchError;
     float rollCorrection = rollCoeff*rollError;
     float depthCorrection = depthCoeff*depthError;
+
+   //printf("%f, %f, %f\n", commandedPitch, commandedRoll, lastDepth);
 
 
     acs_getInstCurrVolt(&currentSensor, &current, &voltage);
@@ -511,36 +519,36 @@ void Propulsion_Task(void *argument){
     power_telemetry_packet.current_ma = (int16_t)(current * 1000.0f);
     power_telemetry_packet.power_mw = (int16_t)((voltage * current) * 1000.0f);
 
-    if(current > 25.0){
-      float currentScalar = -0.2*(current-30.0);
-      if(currentScalar < 0) currentScalar = 0;
+    // if(current > 25.0){
+    //   float currentScalar = -0.2*(current-30.0);
+    //   if(currentScalar < 0) currentScalar = 0;
       
-      t1 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
-      t2 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
-      t3 = 1500 + currentScalar*(PWM_GetPeriod(PWM_3) - 1500 + pitchCorrection - rollCorrection + depthCorrection);
-      t4 = 1500 + currentScalar*(PWM_GetPeriod(PWM_4) - 1500  + pitchCorrection + rollCorrection + depthCorrection);
-      t5 = 1500 + currentScalar*(PWM_GetPeriod(PWM_5) - 1500 - pitchCorrection + depthCorrection);
-    }else {
-      t1 = (thruster_command.joystick1y/2.0) + (thruster_command.joystick1x/2.0) +1500;
-      t2 = (thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0) +1500;
-      t3 = PWM_GetPeriod(PWM_3) + pitchCorrection - rollCorrection + depthCorrection;
-      t4 = PWM_GetPeriod(PWM_4) + pitchCorrection + rollCorrection + depthCorrection;
-      t5 = PWM_GetPeriod(PWM_5) - pitchCorrection + depthCorrection;
-    }
-
+    //   t1 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
+    //   t2 = 1500 + currentScalar*((thruster_command.joystick1y/2.0) - (thruster_command.joystick1x/2.0));
+    //   t3 = 1500 + currentScalar*(PWM_GetPeriod(PWM_3) - 1500 + pitchCorrection - rollCorrection + depthCorrection);
+    //   t4 = 1500 + currentScalar*(PWM_GetPeriod(PWM_4) - 1500  + pitchCorrection + rollCorrection + depthCorrection);
+    //   t5 = 1500 + currentScalar*(PWM_GetPeriod(PWM_5) - 1500 - pitchCorrection + depthCorrection);
+    // }else {
+      t1 = ((-1*(float)thruster_command.joystick1y)/2.0) + (((float)thruster_command.joystick1x)/2.0) +1500;
+      t2 = ((-1*(float)thruster_command.joystick1y)/2.0) - (((float)thruster_command.joystick1x)/2.0) +1500;
+      t3 = 1500.0 + (float)(-pitchCorrection - rollCorrection + depthCorrection);
+      t4 = 1500.0 + (float)(-pitchCorrection + rollCorrection + depthCorrection);
+      t5 = 1500.0 - (float)(-pitchCorrection + depthCorrection);
+    //}
+    //printf("%d, %d\n", t1,t2);
     if(t1>2000)t1=2000;
     if(t2>2000)t2=2000;
     if(t3>2000)t3=2000;
     if(t4>2000)t4=2000;
     if(t5>2000)t5=2000;
 
-    if(t1<1500)t1=1500;
-    if(t2<1500)t2=1500;
-    if(t3<1500)t3=1500;
-    if(t4<1500)t4=1500;
-    if(t5<1500)t5=1500;
+    if(t1<1000)t1=1000;
+    if(t2<1000)t2=1000;
+    if(t3<1000)t3=1000;
+    if(t4<1000)t4=1000;
+    if(t5<1000)t5=1000;
 
-    // printf("%d, %d, %d, %d, %d\n", t1,t2,t3,t4,t5);
+   // printf("%d, %d, %d, %d, %d\n", t1,t2,t3,t4,t5);
     PWM_SetThrusterPeriods(t1,t2,t3,t4,t5);
 
     osDelay(50); // small consistent loop rate

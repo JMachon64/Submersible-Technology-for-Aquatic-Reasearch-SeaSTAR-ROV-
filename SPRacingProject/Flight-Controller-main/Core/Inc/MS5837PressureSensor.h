@@ -42,7 +42,7 @@
 #define  MS5837_02BA_30BA_SEPARATION   37000
 #define  MS5837_30BA_MIN_SENSITIVITY   26000
 
-#define SURFACE_PRESSURE_AVERAGE 1
+#define SURFACE_PRESSURE_AVERAGE 50
 
 extern volatile  uint8_t baseline_set;
 extern volatile float surface_pressure_pa;

@@ -285,7 +285,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             int16_t trigger = (int16_t)(((uint16_t)packet->payLoad[8]) | ((uint16_t)packet->payLoad[9] << 8));
 
             //Apply command
-            Control_Update_Command(x1, y1, x2, y2, trigger);
+            Control_Update_Command(x1, y1, x2, y2, trigger/10.0f);
             break;
         }
 
