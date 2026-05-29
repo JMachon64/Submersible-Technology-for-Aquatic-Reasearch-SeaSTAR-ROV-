@@ -148,8 +148,14 @@ uint8_t Read_MS5837(MS5837_PressureSensor_t *Sensor)
 
 
 	Calculate_MS5837(Sensor);
+	float pressure = MS5837_GetPressure(Sensor, MS5837Pa);
+	if(pressure > 104400.00f){
+		// Sensor->Pressure_Pa = MS5837_GetPressure(Sensor, MS5837Pa);
+	    // Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
+		return 0;
+	}
 
-	Sensor->Pressure_Pa = MS5837_GetPressure(Sensor, MS5837Pa);
+	Sensor->Pressure_Pa = pressure;
 	Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
 	//printf("%d\n", Sensor -> Pressure_Pa);
     return 1;

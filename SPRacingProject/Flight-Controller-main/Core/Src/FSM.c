@@ -118,7 +118,7 @@ uint8_t SeaSTAR_FSM(void)
             {
                 thrusters_disabled = true;
                 return_state = MISSION_MODE_ACTIVE;
-                Control_Update_Command(0, 0, 0, 0, 0);
+
                 starfystate = COLLECT_WATER_SAMPLE_MODE;
 
                 break;

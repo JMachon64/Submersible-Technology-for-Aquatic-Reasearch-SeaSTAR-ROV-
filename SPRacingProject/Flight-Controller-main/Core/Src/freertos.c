@@ -67,7 +67,7 @@ uint8_t uart2_rx_byte;
 
 #define MAX_ROLL 30.0f
 #define MAX_PITCH 30.0f
-#define THRUSTER_SAMPLE_RATE 100
+#define THRUSTER_SAMPLE_RATE 50
 
 
 void I2C_Scan(void);
@@ -324,6 +324,7 @@ void StartSystemHealthMonitorTask(void *argument)
 
 void Propulsion_Task(void *argument){
   PWM_Init();
+
   PWM_SampleClosedPosition();
   Control_Update_Command(0,0,0,0,0);
   Init_TSYS01(&temp_sensor, &hi2c1);
@@ -391,11 +392,11 @@ void Propulsion_Task(void *argument){
 
   const FusionAhrsSettings settings = {
       .convention = FusionConventionNwu,
-      .gain = 0.9f,
-      .gyroscopeRange = 250.0f, /* replace with actual gyroscope range */
-      .accelerationRejection = 10.0f,
-      .magneticRejection = 10.0f,
-      .recoveryTriggerPeriod = 5 * THRUSTER_SAMPLE_RATE, /* 5 seconds */
+      .gain = 0.1f,
+      .gyroscopeRange = 50.0f, /* replace with actual gyroscope range */
+      .accelerationRejection = 5.0f,
+      .magneticRejection = 5.0f,
+      .recoveryTriggerPeriod = 1*THRUSTER_SAMPLE_RATE, /* 1 seconds */
   };
 
   FusionAhrsSetSettings(&ahrs, &settings);
@@ -481,8 +482,17 @@ void Propulsion_Task(void *argument){
     float commandedRoll = thruster_command.joystick2x*MAX_ROLL/1000.0;
     float commandedPitch = thruster_command.joystick2y*MAX_PITCH/1000.0;
 
-    float pitchError = commandedPitch - euler.angle.roll;
-    float rollError = commandedRoll - euler.angle.pitch;
+    // float pitchError = commandedPitch - euler.angle.roll;
+    // float rollError = commandedRoll - euler.angle.pitch;
+    // float depthError = 0;
+
+    float roll = atan(mpu_data.Ax)*(180.0/M_PI);
+    float pitch =  atan(mpu_data.Ay)*(180.0/M_PI);
+
+  //printf("%f, %f\n",roll,pitch);
+
+     float pitchError = commandedPitch - pitch;
+    float rollError = commandedRoll - roll;
     float depthError = 0;
 
    
@@ -492,9 +502,10 @@ void Propulsion_Task(void *argument){
       depthError = lastDepth - (float)environmetal_telemetry_packet.depth;
     }else{
       depthError = (float)(thruster_command.trigger);
+      lastDepth = (float)environmetal_telemetry_packet.depth;
     }
 
-     printf("%f\n", depthError);
+     //printf("%f\n", depthError);
 
 
 
@@ -507,6 +518,13 @@ void Propulsion_Task(void *argument){
     float pitchCorrection = pitchCoeff*pitchError;
     float rollCorrection = rollCoeff*rollError;
     float depthCorrection = depthCoeff*depthError;
+
+    if(rollCorrection>100)rollCorrection = 100;
+    if(rollCorrection<-100)rollCorrection = -100;
+
+    if(pitchCorrection>100)pitchCorrection = 100;
+    if(pitchCorrection<-100)pitchCorrection = -100;
+
 
    //printf("%f, %f, %f\n", commandedPitch, commandedRoll, lastDepth);
 
@@ -533,7 +551,7 @@ void Propulsion_Task(void *argument){
       t2 = ((-1*(float)thruster_command.joystick1y)/2.0) - (((float)thruster_command.joystick1x)/2.0) +1500;
       t3 = 1500.0 + (float)(-pitchCorrection - rollCorrection + depthCorrection);
       t4 = 1500.0 + (float)(-pitchCorrection + rollCorrection + depthCorrection);
-      t5 = 1500.0 - (float)(-pitchCorrection + depthCorrection);
+      t5 = 1500.0 + (float)(pitchCorrection + depthCorrection);
     //}
     //printf("%d, %d\n", t1,t2);
     if(t1>2000)t1=2000;

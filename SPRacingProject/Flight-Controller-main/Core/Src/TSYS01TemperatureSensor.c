@@ -8,7 +8,7 @@
 #include "TelemetryStream.h"
 #include "TSYS01TemperatureSensor.h"
 
-
+volatile float tempcheck = 0;
 static HAL_StatusTypeDef TSYS01_WriteCommand(TSY01_TemperatureSensor_t *Sensor, uint8_t Command)
 {
     return HAL_I2C_Master_Transmit(Sensor->hi2c, Sensor->Address, &Command, 1, 100);
@@ -73,8 +73,13 @@ uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor){
 
     Calculate_TSYS01(Sensor);
 
-    //store temp
-    environmetal_telemetry_packet.temp = (int32_t)(Sensor->Temperature_C * 1000.0f);
+    float temp = tempcheck; 
+    printf("%0.2f\n", temp);
+    if(temp < -10.0f || temp > 80.0f){
+        return 0;
+    }
+   Sensor->Temperature_C  = temp ;
+    environmetal_telemetry_packet.temp = (int32_t)(Sensor->Temperature_C ) * 1000.0f ;
 
     return 1;
 
@@ -84,7 +89,7 @@ void Calculate_TSYS01(TSY01_TemperatureSensor_t *Sensor){
 
     float ADC_Sample = (Sensor -> ADC_Value) / 256.0f;
 
-    Sensor -> Temperature_C = (-2.0f) * ((float)Sensor -> Coefficients[1]) / 1000000000000000000000.0f * powf(ADC_Sample, 4) + 
+    tempcheck = (-2.0f) * ((float)Sensor -> Coefficients[1]) / 1000000000000000000000.0f * powf(ADC_Sample, 4) + 
                                (4.0f) * ((float)Sensor -> Coefficients[2]) / 10000000000000000.0f * powf(ADC_Sample, 3) +     
                               (-2.0f) * ((float)Sensor -> Coefficients[3]) / 100000000000.0f * powf(ADC_Sample, 2) + 
                                (1.0f) * ((float)Sensor -> Coefficients[4]) / 1000000.0f * ADC_Sample + 

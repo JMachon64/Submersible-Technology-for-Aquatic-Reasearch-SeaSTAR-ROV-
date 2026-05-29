@@ -6,6 +6,7 @@
  */
 
 #include "UartProtocol.h"
+#include "ControlLoop.h"
 #include "FSM.h"
 #include "MS5837PressureSensor.h"
 #include "PacketIDs.h"
@@ -285,7 +286,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             int16_t trigger = (int16_t)(((uint16_t)packet->payLoad[8]) | ((uint16_t)packet->payLoad[9] << 8));
 
             //Apply command
-            Control_Update_Command(x1, y1, x2, y2, trigger/10.0f);
+            Control_Update_Command(x1, y1, x2, y2, trigger);
             break;
         }
 
@@ -339,9 +340,10 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
         case ID_COLLECT_WATER_SAMPLE:
         {
 
+            thrusters_disabled = 1;
             FSM_PostEvent(FSM_EVENT_COLLECT_WATER_SAMPLE);
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
-
+            Control_Update_Command(0,0,0,0,0);
             break;
         }
 

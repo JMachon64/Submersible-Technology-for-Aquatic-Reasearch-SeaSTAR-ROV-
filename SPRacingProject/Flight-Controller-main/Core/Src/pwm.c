@@ -39,8 +39,6 @@ static unsigned char pinsAdded = 0x00;
 
 
 char PWM_Init(void) {
-    if (init_status == FALSE) { // if PWM module has not been inited
-        init_status = TRUE;
         HAL_TIM_PWM_Start(PWM_1.timer, PWM_1.channel);
         HAL_TIM_PWM_Start(PWM_2.timer, PWM_2.channel);
         HAL_TIM_PWM_Start(PWM_3.timer, PWM_3.channel);
@@ -49,7 +47,9 @@ char PWM_Init(void) {
         HAL_TIM_PWM_Start(PWM_6.timer, PWM_6.channel);
         HAL_TIM_PWM_Start(PWM_7.timer, PWM_7.channel);
         HAL_TIM_PWM_Start(PWM_8.timer, PWM_8.channel);
-    }
+        PWM_SetThrusterPeriods(1500,1500,1500,1500,1500); 
+
+
     return SUCCESS;
 }
 
