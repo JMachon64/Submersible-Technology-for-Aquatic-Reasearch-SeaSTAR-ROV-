@@ -519,11 +519,11 @@ void Propulsion_Task(void *argument){
     float rollCorrection = rollCoeff*rollError;
     float depthCorrection = depthCoeff*depthError;
 
-    if(rollCorrection>100)rollCorrection = 100;
-    if(rollCorrection<-100)rollCorrection = -100;
+    if(rollCorrection>200)rollCorrection = 200;
+    if(rollCorrection<-200)rollCorrection = -200;
 
-    if(pitchCorrection>100)pitchCorrection = 100;
-    if(pitchCorrection<-100)pitchCorrection = -100;
+    if(pitchCorrection>200)pitchCorrection = 200;
+    if(pitchCorrection<-200)pitchCorrection = -200;
 
 
    //printf("%f, %f, %f\n", commandedPitch, commandedRoll, lastDepth);
@@ -551,7 +551,7 @@ void Propulsion_Task(void *argument){
       t2 = ((-1*(float)thruster_command.joystick1y)/2.0) - (((float)thruster_command.joystick1x)/2.0) +1500;
       t3 = 1500.0 + (float)(-pitchCorrection - rollCorrection + depthCorrection);
       t4 = 1500.0 + (float)(-pitchCorrection + rollCorrection + depthCorrection);
-      t5 = 1500.0 + (float)(pitchCorrection + depthCorrection);
+      t5 = 1500.0 + (float)(2.0*pitchCorrection + depthCorrection);
     //}
     //printf("%d, %d\n", t1,t2);
     if(t1>2000)t1=2000;
