@@ -334,19 +334,7 @@ void Propulsion_Task(void *argument){
   printf("|Sensor and Propulsion Task has been initialized...|\r\n");
   printf("\r\n");
 
-  acs37800_t currentSensor = {
-    .divRes = 2000000,
-    .i2c_address = 0x60,
-    .i2c_device = &hi2c1,
-    .senseRes = 8200,
-    .maxCurrent = 30,
-    .maxVolt = 160
-  };
-  acs_setBybassNenable(&currentSensor, true, true);
-  acs_setNumberOfSamples(&currentSensor, 1023, true);
-    
   MPU6050_Init(&hi2c1);
-  HMC5883L_Init(&hi2c1);
 
   float current = 0;
   float voltage = 0;
@@ -359,21 +347,8 @@ void Propulsion_Task(void *argument){
   surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
 
   MPU6050_t mpu_data;
-  int16_t mag_data[3];
   float lastDepth = 0;
   
-
-
-  FusionMatrix gyroscopeMisalignment = {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
-  FusionVector gyroscopeSensitivity = {{1.0f, 1.0f, 1.0f}};
-  FusionVector gyroscopeOffset = {{0}};
-
-  FusionMatrix accelerometerMisalignment = {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
-  FusionVector accelerometerSensitivity = {{1.0f, 1.0f, 1.0f}};
-  FusionVector accelerometerOffset = {{0.0f, 0.0f, 0.0f}};
-
-  FusionMatrix softIronMatrix = {{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
-  FusionVector hardIronOffset = {{0.0f, 0.0f, 0.0f}};
 
   for(int i = 0; i < 10; i++){
     MPU6050_Read_All(&mpu_data);
@@ -386,31 +361,6 @@ void Propulsion_Task(void *argument){
   gyroscopeOffset.axis.y /= 10.0;
   gyroscopeOffset.axis.z /= 10.0;
 
-    // Instantiate AHRS algorithm
-  FusionAhrs ahrs;
-  FusionAhrsInitialise(&ahrs);
-
-  const FusionAhrsSettings settings = {
-      .convention = FusionConventionNwu,
-      .gain = 0.1f,
-      .gyroscopeRange = 50.0f, /* replace with actual gyroscope range */
-      .accelerationRejection = 5.0f,
-      .magneticRejection = 5.0f,
-      .recoveryTriggerPeriod = 1*THRUSTER_SAMPLE_RATE, /* 1 seconds */
-  };
-
-  FusionAhrsSetSettings(&ahrs, &settings);
-
-  // Instantiate bias algorithm
-  FusionBias bias;
-  FusionBiasInitialise(&bias);
-
-  FusionBiasSettings biasSettings = fusionBiasDefaultSettings;
-  biasSettings.sampleRate = THRUSTER_SAMPLE_RATE;
-
-  FusionBiasSetSettings(&bias, &biasSettings);
-
-  //HMC5883L_HardIronCalibrate(10000);
 
   uint16_t t1, t2, t3, t4, t5;
 
@@ -438,64 +388,24 @@ void Propulsion_Task(void *argument){
 
       MPU6050_Init(&hi2c1);
   }
-    HMC5883L_GetCalibratedXData(&mag_data[0]);
-    HMC5883L_GetCalibratedYData(&mag_data[1]);
-    HMC5883L_GetCalibratedZData(&mag_data[2]);
 
-    uint32_t timestamp = xTaskGetTickCount();
-    FusionVector gyroscope = {{mpu_data.Gx, mpu_data.Gy, mpu_data.Gz}};
-    FusionVector accelerometer = {{mpu_data.Ax, mpu_data.Ay, mpu_data.Az}};
-    FusionVector magnetometer = {{(float)(mag_data[0]), (float)(mag_data[1]), (float)(mag_data[2])}};
 
-    //printf("%f, %f, %f, %f, %f, %f\n", mpu_data.Ax, mpu_data.Ay, mpu_data.Az, mpu_data.Gx, mpu_data.Gy, mpu_data.Gz);
-
-    // Apply calibration
-    gyroscope = FusionModelInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
-    accelerometer = FusionModelInertial(accelerometer, accelerometerMisalignment, accelerometerSensitivity, accelerometerOffset);
-    magnetometer = FusionModelMagnetic(magnetometer, softIronMatrix, hardIronOffset);
-
-    // Update bias algorithm
-    gyroscope = FusionBiasUpdate(&bias, gyroscope);
-
-    // Calculate delta time to compensate for gyroscope sample clock errors
-    static uint32_t previousTimestamp;
-    const float deltaTime = (float) (timestamp - previousTimestamp)/1000.0;
-    previousTimestamp = timestamp;
-
-    // Update AHRS algorithm
-    FusionAhrsUpdate(&ahrs, gyroscope, accelerometer, magnetometer, deltaTime);
-
-    // Print AHRS outputs
-    const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
-    const FusionVector earth = FusionAhrsGetEarthAcceleration(&ahrs);
-    // printf("yaw %0.1f, pitch %0.1f, roll %0.1f, X %0.1f, Y %0.1f, Z %0.1f\n",
-    //         euler.angle.yaw, euler.angle.pitch, euler.angle.roll,
-    //         earth.axis.x, earth.axis.y, earth.axis.z);
+    float roll = atan(mpu_data.Ax)*(180.0/M_PI);
+    float pitch =  atan(mpu_data.Ay)*(180.0/M_PI);
     
     // SEND THE EULER ANGLES AS A PACKET //
     
-    positional_telemetry_packet.yaw = (int16_t)(euler.angle.yaw * 100.0f);
-    positional_telemetry_packet.pitch = (int16_t)(euler.angle.pitch * 100.0f);
-    positional_telemetry_packet.roll = (int16_t)(euler.angle.roll * 100.0f);
+    positional_telemetry_packet.yaw = (int16_t)(0 * 100.0f);
+    positional_telemetry_packet.pitch = (int16_t)(pitch * 100.0f);
+    positional_telemetry_packet.roll = (int16_t)(roll * 100.0f);
 
 
     float commandedRoll = thruster_command.joystick2x*MAX_ROLL/1000.0;
     float commandedPitch = thruster_command.joystick2y*MAX_PITCH/1000.0;
 
-    // float pitchError = commandedPitch - euler.angle.roll;
-    // float rollError = commandedRoll - euler.angle.pitch;
-    // float depthError = 0;
-
-    float roll = atan(mpu_data.Ax)*(180.0/M_PI);
-    float pitch =  atan(mpu_data.Ay)*(180.0/M_PI);
-
-  //printf("%f, %f\n",roll,pitch);
-
      float pitchError = commandedPitch - pitch;
     float rollError = commandedRoll - roll;
     float depthError = 0;
-
-   
 
 
     if(thruster_command.trigger == 0){
@@ -504,11 +414,6 @@ void Propulsion_Task(void *argument){
       depthError = (float)(thruster_command.trigger);
       lastDepth = (float)environmetal_telemetry_packet.depth;
     }
-
-     //printf("%f\n", depthError);
-
-
-
     float pitchCoeff = 10.0;
     float rollCoeff = 10.0;
     float depthCoeff = 0.50;
@@ -525,13 +430,6 @@ void Propulsion_Task(void *argument){
     if(pitchCorrection>200)pitchCorrection = 200;
     if(pitchCorrection<-200)pitchCorrection = -200;
 
-
-   //printf("%f, %f, %f\n", commandedPitch, commandedRoll, lastDepth);
-
-
-    acs_getInstCurrVolt(&currentSensor, &current, &voltage);
-    current = fabs(current);
-    voltage = fabs(voltage);
     
     power_telemetry_packet.voltage_mv = (int16_t)(voltage* 1000.0f);
     power_telemetry_packet.current_ma = (int16_t)(current * 1000.0f);
@@ -553,7 +451,6 @@ void Propulsion_Task(void *argument){
       t4 = 1500.0 + (float)(-pitchCorrection + rollCorrection + depthCorrection);
       t5 = 1500.0 + (float)(2.0*pitchCorrection + depthCorrection);
     //}
-    //printf("%d, %d\n", t1,t2);
     if(t1>2000)t1=2000;
     if(t2>2000)t2=2000;
     if(t3>2000)t3=2000;
@@ -566,7 +463,6 @@ void Propulsion_Task(void *argument){
     if(t4<1000)t4=1000;
     if(t5<1000)t5=1000;
 
-   // printf("%d, %d, %d, %d, %d\n", t1,t2,t3,t4,t5);
     PWM_SetThrusterPeriods(t1,t2,t3,t4,t5);
 
     osDelay(50); // small consistent loop rate
