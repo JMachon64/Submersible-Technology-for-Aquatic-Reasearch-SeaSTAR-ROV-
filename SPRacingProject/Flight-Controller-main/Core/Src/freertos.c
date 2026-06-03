@@ -339,7 +339,26 @@ void Propulsion_Task(void *argument){
   float current = 0;
   float voltage = 0;
 
-  HMC5883L_Configure();
+  float roll = 0;
+  float pitch = 0;
+
+
+  float commandedRoll = 0;
+  float commandedPitch = 0;
+
+
+  float pitchCoeff = 10.0;
+  float rollCoeff = 10.0;
+  float depthCoeff = 0.50;
+
+  
+  float pitchError = 0;
+  float rollError = 0;
+  float depthError = 0;
+
+  float pitchCorrection = 0;
+  float rollCorrection = 0;
+  float depthCorrection = 0;
 
 
 
@@ -390,9 +409,9 @@ void Propulsion_Task(void *argument){
   }
 
 
-    float roll = atan(mpu_data.Ax)*(180.0/M_PI);
-    float pitch =  atan(mpu_data.Ay)*(180.0/M_PI);
-    
+    roll = atan(mpu_data.Ax)*(180.0/M_PI);
+    pitch =  atan(mpu_data.Ay)*(180.0/M_PI);
+
     // SEND THE EULER ANGLES AS A PACKET //
     
     positional_telemetry_packet.yaw = (int16_t)(0 * 100.0f);
@@ -400,13 +419,11 @@ void Propulsion_Task(void *argument){
     positional_telemetry_packet.roll = (int16_t)(roll * 100.0f);
 
 
-    float commandedRoll = thruster_command.joystick2x*MAX_ROLL/1000.0;
-    float commandedPitch = thruster_command.joystick2y*MAX_PITCH/1000.0;
+    commandedRoll = -1*thruster_command.joystick2x*MAX_ROLL/1000.0;
+    commandedPitch = thruster_command.joystick2y*MAX_PITCH/1000.0;
 
-     float pitchError = commandedPitch - pitch;
-    float rollError = commandedRoll - roll;
-    float depthError = 0;
-
+    pitchError = commandedPitch - pitch;
+    rollError = commandedRoll - roll;
 
     if(thruster_command.trigger == 0){
       depthError = lastDepth - (float)environmetal_telemetry_packet.depth;
@@ -414,15 +431,11 @@ void Propulsion_Task(void *argument){
       depthError = (float)(thruster_command.trigger);
       lastDepth = (float)environmetal_telemetry_packet.depth;
     }
-    float pitchCoeff = 10.0;
-    float rollCoeff = 10.0;
-    float depthCoeff = 0.50;
 
+    pitchCorrection = pitchCoeff*pitchError;
+    rollCorrection = rollCoeff*rollError;
+    depthCorrection = depthCoeff*depthError;
 
-
-    float pitchCorrection = pitchCoeff*pitchError;
-    float rollCorrection = rollCoeff*rollError;
-    float depthCorrection = depthCoeff*depthError;
 
     if(rollCorrection>200)rollCorrection = 200;
     if(rollCorrection<-200)rollCorrection = -200;
@@ -445,8 +458,8 @@ void Propulsion_Task(void *argument){
     //   t4 = 1500 + currentScalar*(PWM_GetPeriod(PWM_4) - 1500  + pitchCorrection + rollCorrection + depthCorrection);
     //   t5 = 1500 + currentScalar*(PWM_GetPeriod(PWM_5) - 1500 - pitchCorrection + depthCorrection);
     // }else {
-      t1 = ((-1*(float)thruster_command.joystick1y)/2.0) + (((float)thruster_command.joystick1x)/2.0) +1500;
-      t2 = ((-1*(float)thruster_command.joystick1y)/2.0) - (((float)thruster_command.joystick1x)/2.0) +1500;
+      t1 = 1500.0 + ((-1*(float)thruster_command.joystick1y)/2.0) + (((float)thruster_command.joystick1x)/2.0);
+      t2 = 1500.0 + ((-1*(float)thruster_command.joystick1y)/2.0) - (((float)thruster_command.joystick1x)/2.0);
       t3 = 1500.0 + (float)(-pitchCorrection - rollCorrection + depthCorrection);
       t4 = 1500.0 + (float)(-pitchCorrection + rollCorrection + depthCorrection);
       t5 = 1500.0 + (float)(2.0*pitchCorrection + depthCorrection);
