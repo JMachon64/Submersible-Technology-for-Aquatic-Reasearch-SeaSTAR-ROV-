@@ -1,19 +1,35 @@
 /* 
- * File:   UartProtocol.h
+ * File:   MS5837PressureSensor.c
  * Author: Jose Machon
  *
- * Created on April 1, 2026, 9:24 AM
+ * Created on April 6, 2026, 3:54 PM
+ * 
+ * The only function written by Jose Machon was Callibrate_MS5837. All other code 
+ * was taken from documentation.
+ * This library was translated into C and was originally in python. The github 
+ * documentation for this library is: https://github.com/bluerobotics/BlueRobotics_MS5837_Library
+ *
  */
 
 #include "MS5837PressureSensor.h"
 #include "TelemetryStream.h"
 
-// static const uint16_t fluiddensity = 1029;
 
 volatile float pressure_offset = 0.0f;
 volatile float surface_pressure_pa = 0.0f;
 volatile uint8_t baseline_set = 0;
 
+
+/* 
+ * 
+ * This function was added by Jose Machon, as testing the pressure sensor, a consistent 
+ * observable offset was noted. To compensate, an initail callibration was used that 
+ * samples and takes the average of that atmospheric pressure reading. That is then 
+ * subtracted by the commonly accepted atmospheric pressure of 101325 to find the offset. 
+ * This is in an effort to make depth readings more accurate, although other sensors 
+ * may not have the same issue.
+ *
+ */
 float Callibrate_MS5837(MS5837_PressureSensor_t *Sensor, uint16_t Samples)
 {
     float sum = 0.0f;
@@ -32,8 +48,6 @@ float Callibrate_MS5837(MS5837_PressureSensor_t *Sensor, uint16_t Samples)
     }
 
     float baseline = sum / Samples;
-
-    printf("Surface baseline = %ld Pa\r\n", (int32_t)baseline);
 
 	baseline_set = 1;
     pressure_offset = 101000.00f - baseline;
@@ -81,14 +95,6 @@ uint8_t Init_MS5837(MS5837_PressureSensor_t *Sensor,I2C_HandleTypeDef *hi2c){
 
     uint8_t crcRead = Sensor->Coefficients[0] >> 12;
     uint8_t crcCalculated = crc4(Sensor->Coefficients);
-    for (uint8_t i = 0; i < 7; i++)
-        {
-      //      printf("C[%d] = %u\r\n", i, Sensor->Coefficients[i]);
-        }
-
-   // printf("CRC read = %u, CRC calc = %u\r\n", crcRead, crcCalculated);
- //   printf("Model = %d\r\n", Sensor->Model);
-	// Verify that data is correct with CRC
 
 	if ( crcCalculated != crcRead ) {
 		return 0; // CRC fail
@@ -147,17 +153,19 @@ uint8_t Read_MS5837(MS5837_PressureSensor_t *Sensor)
     Sensor -> D2_ADC_Temperature = ((uint32_t)buffer[0] << 16 | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2]);
 
 
+
+	//THIS IS THE FUNCTION THAT PREVENTED GOOD DEPTH READINGS.
 	Calculate_MS5837(Sensor);
 	float pressure = MS5837_GetPressure(Sensor, MS5837Pa);
-	if(pressure > 104400.00f){
-		// Sensor->Pressure_Pa = MS5837_GetPressure(Sensor, MS5837Pa);
-	    // Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
-		return 0;
-	}
+	// if(pressure > 104400.00f){
+	// 	// Sensor->Pressure_Pa = MS5837_GetPressure(Sensor, MS5837Pa);
+	//     // Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
+	// 	return 0;
+	// }
 
 	Sensor->Pressure_Pa = pressure;
 	Sensor->Depth_m     = MS5837_GetDepth(Sensor, 1029.0f);
-	//printf("%d\n", Sensor -> Pressure_Pa);
+
     return 1;
 }
 

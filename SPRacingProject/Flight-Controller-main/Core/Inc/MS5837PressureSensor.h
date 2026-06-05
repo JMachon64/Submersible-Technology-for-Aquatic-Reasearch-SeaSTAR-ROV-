@@ -5,6 +5,7 @@
  *
  * Created on April 1, 2026, 9:24 AM
  */
+
 #ifndef MS5837_PRESSURE_SENSOR_H
 #define MS5837_PRESSURE_SENSOR_H
 
@@ -15,7 +16,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
-
 
 /* 
  * 
@@ -30,6 +30,12 @@
 #define  MS5837_CONVERT_D1_8192   0x4A
 #define  MS5837_CONVERT_D2_8192   0x5A
 
+/* 
+ * Sensor conversion values.
+ * 
+ * 
+ */ 
+
 #define  MS5837Pa     100.0f
 #define  MS5837bar    0.001f
 #define  MS5837mbar   1.0f
@@ -38,9 +44,19 @@
 #define MS5837_02BA   1
 #define MS5837_UNRECOGNISED   255
 
+/* 
+ * Sensor sensitivities depending on the model, used to calculate depth.
+ * 
+ * 
+ */ 
+
 #define  MS5837_02BA_MAX_SENSITIVITY   49000
 #define  MS5837_02BA_30BA_SEPARATION   37000
 #define  MS5837_30BA_MIN_SENSITIVITY   26000
+
+/* 
+ * Sampling callibration value.
+ */  
 
 #define SURFACE_PRESSURE_AVERAGE 50
 
@@ -49,9 +65,7 @@ extern volatile float surface_pressure_pa;
 extern volatile float pressure_offset;
 
 /* 
- * 
- * 
- * 
+ * Struct storing all relevant sensor data.
  */
 
 typedef struct {
@@ -81,9 +95,7 @@ typedef struct {
  * 
  */
 
-
-extern volatile float bad_mode_offset_pa;
-
+// initilization function
 uint8_t Init_MS5837(MS5837_PressureSensor_t *Sensor,I2C_HandleTypeDef *hi2c);
 
 float Callibrate_MS5837(MS5837_PressureSensor_t *Sensor, uint16_t Samples);
@@ -93,15 +105,15 @@ uint8_t Read_MS5837(MS5837_PressureSensor_t *Sensor);
 void Calculate_MS5837(MS5837_PressureSensor_t *Sensor);
 
 float MS5837_GetPressure(MS5837_PressureSensor_t *Sensor, float conversion);
-
 float MS5837_GetTemp(MS5837_PressureSensor_t *Sensor);
-
 float MS5837_GetDepth(MS5837_PressureSensor_t *Sensor, float fluiddensity);
 
-float MS5837_GetAltitude(MS5837_PressureSensor_t *Sensor);
-
 uint8_t  MS5837_GetModel(MS5837_PressureSensor_t *Sensor);
-
 uint8_t crc4(uint16_t *Coefficients);
+
+
+
+// Unused function for our needs, did not test this.
+float MS5837_GetAltitude(MS5837_PressureSensor_t *Sensor);
 
 #endif

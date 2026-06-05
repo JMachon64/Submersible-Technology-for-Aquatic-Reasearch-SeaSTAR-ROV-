@@ -17,6 +17,12 @@
 #include "TelemetryStream.h"
 #include "ControlLoop.h"
 #include "LeakDetection.h"
+#include "ControlLoop.h"
+#include "FSM.h"
+#include "MS5837PressureSensor.h"
+#include "PacketIDs.h"
+#include "stm32f3xx_hal.h"
+#include <stdbool.h>
 #include <stdio.h>
 #define HEAD 204
 
@@ -46,7 +52,6 @@ typedef struct {
 extern volatile uint8_t heartbeat_enabled;
 extern volatile uint8_t comm_failure;
 
-
 uint16_t CalculateCyclicalRedundancyCheck(const uint8_t *data, uint16_t length);
 
 uint8_t Protocol_SendDebugMessage(char *Message);
@@ -58,8 +63,6 @@ uint8_t BuildRxPacket(Packet_Sent_t *rxPacket, unsigned char reset);
 uint8_t CalculateThroughPut(void);
 
 uint8_t Protocol_SendPacket(uint8_t len, uint8_t ID, void *Payload);
-
-void Protocol_UpdateThroughput(void);
 
 void communication_status();
 

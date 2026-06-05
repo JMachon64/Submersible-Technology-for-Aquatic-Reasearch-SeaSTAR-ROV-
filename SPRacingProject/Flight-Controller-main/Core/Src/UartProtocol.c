@@ -1,17 +1,16 @@
 /* 
- * File:   UartProtocol.h
+ * File:   UartProtocol.c
  * Author: Jose Machon
  *
- * Created on April 1, 2026, 9:24 AM
+ * Created on March 10, 2026, 9:43 AM
+ *
+ * Most of this code was taken from my experience in embedded system design ECE 121. 
+ * The entire UartProtocol was part of a lab but a crc check replaced the standard checksum for 
+ * robustness. The packet parser is also customized to suite the application needs of the SeaSTAR.
+ * 
  */
 
 #include "UartProtocol.h"
-#include "ControlLoop.h"
-#include "FSM.h"
-#include "MS5837PressureSensor.h"
-#include "PacketIDs.h"
-#include "stm32f3xx_hal.h"
-#include <stdbool.h>
 
 typedef struct {
     uint8_t len;
@@ -76,31 +75,6 @@ static Built_Packet_t builtpacket = WAIT_START;
 static uint8_t crc_low = 0;
 static uint8_t index   = 0;
 
-volatile uint32_t Packet_Bytes    = 0;
-volatile uint32_t Control_Packets = 0;
-volatile uint32_t Ping_Packets    = 0;
-
-void Protocol_UpdateThroughput(void)
-{
-    static uint32_t last_time = 0;
-    uint32_t now = HAL_GetTick();
-
-    if ((now - last_time) >= 1000)
-    {
-        uint32_t bytes = Packet_Bytes;
-        uint32_t ctrl = Control_Packets;
-        uint32_t ping = Ping_Packets;
-        uint32_t throughput = (bytes * 100) / BAUDRATEBYTES;
-
-      //  printf("Bytes/sec: %lu, CTRL/sec: %lu, PING/sec: %lu, Throughput: %lu%%\r\n", bytes, ctrl, ping, throughput);
-
-        Packet_Bytes = 0;
-        Control_Packets = 0;
-        Ping_Packets = 0;
-        last_time = now;
-
-    }
-}
 
 uint8_t BuildRxPacket(Packet_Sent_t *rxPacket, unsigned char reset)
 {
@@ -116,8 +90,6 @@ uint8_t BuildRxPacket(Packet_Sent_t *rxPacket, unsigned char reset)
     
     while (GetChar(&val))
     {
-
-        Packet_Bytes++;
 
         switch (builtpacket)
         {
@@ -192,8 +164,7 @@ uint8_t BuildRxPacket(Packet_Sent_t *rxPacket, unsigned char reset)
     return 0;
 }
 
-volatile uint32_t last_heartbeat    = false;
-
+volatile uint32_t last_heartbeat = false;
 
 uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 {
@@ -201,21 +172,19 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
     switch (packet->ID)
     {
-        //BOOT PACKETS
+        //BOOT PACKETS HAS THE HANDSHAKE PROTOCOL 
         case ID_PI_HELLO:
         {
             if (packet->len != 4)
             {
-                printf("Bad PI_HELLO length: %u\r\n", packet->len);
                 break;
             }
 
-            // printf("GOT HELLO\n");
             uint32_t acknowlegdment_timestamp_ms = HAL_GetTick();
 
 
             if(propulsion_initialized && baseline_set && !comm_failure){
-                printf("BOOTING DONE...\n\n");
+
                 last_heartbeat = HAL_GetTick(); 
                 heartbeat_enabled = true;
                 comm_failure = false;
@@ -226,7 +195,8 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             }
 
             if(comm_failure){
-                printf("RECONNECTED...\n\n");
+
+            
                 heartbeat_enabled = true;
                 comm_failure = false;
                 last_heartbeat = HAL_GetTick();
@@ -248,11 +218,9 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
                 break;
             }
 
-            Ping_Packets++;
             //printf("PONG\n");
             if (packet->len != 4)
             {
-                printf("Bad ping packet length: %u\r\n", packet->len);
                 break;
             }
        
@@ -262,23 +230,18 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             break;
         }
 
-    // THRUSTER CONTROL 
+         // THRUSTER CONTROL 
         case ID_THRUSTER_INPUT:
         {
-            Control_Packets++;
 
             if (packet->len != 10)
             {
-                printf("INVALID thruster control packet length: %u\r\n", packet->len);
                 break;
             }
 
-            if(thrusters_disabled){
+            if(thrusters_disabled){break;}
 
-                break;
-
-            }
-
+            // PARSE THE THRUSTER COMMANDS FROM THE GAME CONTROLLER 
             int16_t x1      = (int16_t)(((uint16_t)packet->payLoad[0]) | ((uint16_t)packet->payLoad[1] << 8));
             int16_t y1      = (int16_t)(((uint16_t)packet->payLoad[2]) | ((uint16_t)packet->payLoad[3] << 8));
             int16_t x2      = (int16_t)(((uint16_t)packet->payLoad[4]) | ((uint16_t)packet->payLoad[5] << 8));
@@ -295,15 +258,12 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
         case ID_START_MISSION:
         {
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
-            printf("START MISSION\n");
             FSM_PostEvent(FSM_EVENT_START_MISSION);
             break;
         }
 
         case ID_END_MISSION:
         {
-
-            printf("END MISSION\n");
 
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             FSM_PostEvent(FSM_EVENT_END_MISSION);
@@ -318,8 +278,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
             }
 
             pi_healthy = false;
-        
-            printf("PI FAILURE DETECTED\n");
+    
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             FSM_PostEvent(FSM_EVENT_PI_FAILURE);
             break; 
@@ -328,7 +287,7 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
         case ID_PI_RECOVERY:
         {
             pi_healthy = 1;
-            printf("PI RECOVER DETECTED\n");
+
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             FSM_PostEvent(FSM_EVENT_PI_RECOVERY);
             break;
@@ -349,7 +308,6 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
         case ID_NAVIGATION_LIGHTS_ON:
         {
-            printf("LIGHTS ON...\n");
             NavigationLights_On();  
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             break;
@@ -357,7 +315,6 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
         case ID_NAVIGATION_LIGHTS_OFF:
         {
-            printf("LIGHTS OFF...\n");
             NavigationLights_Off();
             Protocol_SendPacket(4, ID_PACKET_ACKNOWLEGDED, packet->payLoad);
             break;
@@ -376,14 +333,13 @@ uint8_t Protocol_ParsePacket(Packet_Sent_t *packet)
 
 void communication_status(){
 
-    if(!heartbeat_enabled){return;}
+    if(!heartbeat_enabled){return;} //Either the stm32 is still booting and unresponsive or in failure.
 
     uint32_t current_time = HAL_GetTick();
 
     if(current_time - last_heartbeat >= COMMUNICATION_TIMEOUT){
         FSM_PostEvent(FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE);
         heartbeat_enabled = false;
-        printf("FAILURE\n");
        }
 
 }

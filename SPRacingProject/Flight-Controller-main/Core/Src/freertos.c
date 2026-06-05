@@ -56,6 +56,8 @@
 
 TSY01_TemperatureSensor_t temp_sensor;
 MS5837_PressureSensor_t pressure_sensor;
+
+
 extern volatile control_command_t thruster_command;
 extern environmental_packet_t environmetal_telemetry_packet;
 uint8_t uart2_rx_byte;
@@ -69,23 +71,6 @@ uint8_t uart2_rx_byte;
 #define MAX_PITCH 30.0f
 #define THRUSTER_SAMPLE_RATE 50
 
-
-void I2C_Scan(void);
-
-void I2C_Scan(void)
-{
-    printf("Scanning I2C bus...\r\n");
-
-    for (uint8_t addr = 1; addr < 128; addr++)
-    {
-        if (HAL_I2C_IsDeviceReady(&hi2c1, addr << 1, 2, 10) == HAL_OK)
-        {
-            printf("Found device at 0x%02X\r\n", addr);
-        }
-    }
-
-    printf("Scan complete.\r\n");
-}
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -197,17 +182,12 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
 
-   //SamplingTaskHandle = osThreadNew(StartSamplingTask, NULL, &SamplingTask_attributes);
    UartStreamTaskHandle      = osThreadNew(StartWiredUARTStream, NULL, &UartStreamTask_attributes);
    StateMachineTaskHandle    = osThreadNew(StartStateMachineTask, NULL, &StateMachineTask_attributes);
    SystemHealthMonitorTask   = osThreadNew(StartSystemHealthMonitorTask, NULL, &SystemHealthMonitorTask_attributes);
-   //TelemetryStreamTaskHandle = osThreadNew(StartTelemetryStreamTask, NULL, &TelemetryStreamTask_attributes);
    PropulsionTaskHandle      = osThreadNew(Propulsion_Task, NULL, &PropulsionTask_attributes);
 
   /* USER CODE END RTOS_THREADS */
-  if(StateMachineTaskHandle ==  NULL){
-    printf("STATE MACHINE FAILED \n");
-  }
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
@@ -230,7 +210,7 @@ void StartWiredUARTStream(void *argument)
     printf("|Uart Task has been initialized...|\r\n");
     printf("\r\n");
 
-    Packet_Sent_t rxPacket;
+    Packet_Sent_t rxPacket; 
 
     for (;;)
     {
@@ -255,18 +235,12 @@ void StartWiredUARTStream(void *argument)
             orientationsampleflag = 0;
             TelemetryStream_SendOrientation(&positional_telemetry_packet);
         }
-        else if (powersampleflag && baseline_set)
-        {
-            powersampleflag = 0;
-            TelemetryStream_SendPowerStatus(&power_telemetry_packet);
-        }
+
         else if (BuildRxPacket(&rxPacket, 0))
         {
             Protocol_ParsePacket(&rxPacket);
         }
         
-        Protocol_UpdateThroughput(); //count the throughput 
-
         osDelay(1);
     }
   /* USER CODE END 5 */
@@ -283,8 +257,10 @@ void StartStateMachineTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+
     SeaSTAR_FSM();
     osDelay(500);
+
   }
   /* USER CODE END 5 */
 
@@ -296,23 +272,19 @@ void StartSystemHealthMonitorTask(void *argument)
   printf("\r\n");
   printf("|Initializing system health monitor task...|\r\n");
   printf("\r\n");
-    PWM_Init();
+
   /* Infinite loop */
   for(;;)
   {
-    //HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_4);  //TEST THE NAV LIGHTS BY TOGGLING
-   
+
     //MONITOR LEAKS 
     if(!leakLatched){ LeakSensor_Read();}
 
 
     //MONITOR COMMUNICATION STATUS 
     if(heartbeat_enabled ==  1){
-          communication_status();   
+      communication_status();   
     }
-
-    // //MONITOR THRUSTER CURRENT
-
 
     osDelay(1000);
   }
@@ -323,21 +295,30 @@ void StartSystemHealthMonitorTask(void *argument)
 
 
 void Propulsion_Task(void *argument){
-  PWM_Init();
 
-  PWM_SampleClosedPosition();
-  Control_Update_Command(0,0,0,0,0);
-  Init_TSYS01(&temp_sensor, &hi2c1);
-  Init_MS5837(&pressure_sensor, &hi2c1);
-
+  
   printf("\r\n");
   printf("|Sensor and Propulsion Task has been initialized...|\r\n");
   printf("\r\n");
 
+
+  PWM_Init();
+
+  PWM_SampleClosedPosition();
+  Control_Update_Command(0,0,0,0,0);
+
+  //Initialize environmental sensors 
+  Init_TSYS01(&temp_sensor, &hi2c1);
+  Init_MS5837(&pressure_sensor, &hi2c1);
+
+  // Take the average of the initial atmospheric pressure reading
+  surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
+
+
   MPU6050_Init(&hi2c1);
 
-  float current = 0;
-  float voltage = 0;
+  // float current = 0;
+  // float voltage = 0;
 
   float roll = 0;
   float pitch = 0;
@@ -360,11 +341,6 @@ void Propulsion_Task(void *argument){
   float rollCorrection = 0;
   float depthCorrection = 0;
 
-
-
-  // Take the average of the initial atmospheric pressure reading
-  surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
-
   MPU6050_t mpu_data;
   float lastDepth = 0;
   
@@ -383,11 +359,12 @@ void Propulsion_Task(void *argument){
 
   uint16_t t1, t2, t3, t4, t5;
 
-  propulsion_initialized = 1;
+  propulsion_initialized = 1; //Update conditional to exit boot mode.
 
   while(1){
 
-      if (sensorsampleflag)
+    // sample environmental sensors every 100ms
+  if (sensorsampleflag)
       {
           sensorsampleflag = 0;
 
@@ -396,7 +373,7 @@ void Propulsion_Task(void *argument){
       }
 
 
-   MPU6050_Read_All(&mpu_data);
+  MPU6050_Read_All(&mpu_data);
   if (hi2c1.ErrorCode != HAL_I2C_ERROR_NONE)
   {
 
@@ -443,10 +420,6 @@ void Propulsion_Task(void *argument){
     if(pitchCorrection>200)pitchCorrection = 200;
     if(pitchCorrection<-200)pitchCorrection = -200;
 
-    
-    power_telemetry_packet.voltage_mv = (int16_t)(voltage* 1000.0f);
-    power_telemetry_packet.current_ma = (int16_t)(current * 1000.0f);
-    power_telemetry_packet.power_mw = (int16_t)((voltage * current) * 1000.0f);
 
     // if(current > 25.0){
     //   float currentScalar = -0.2*(current-30.0);
@@ -481,35 +454,6 @@ void Propulsion_Task(void *argument){
     osDelay(50); // small consistent loop rate
 
     }
-}
-
-void StartTelemetryStreamTask(void *argument)
-{
-    printf("\r\n");
-    printf("|Telemetry Stream Task has been initialized...|\r\n");
-    printf("\r\n");
-    PWM_Init();
-
-
-    printf("Started Telemetry Stream Task...\n");
-
-    printf("MUX OFF SCAN:\r\n");
-    I2C_Scan();
-
-    Init_TSYS01(&temp_sensor, &hi2c1);
-    Init_MS5837(&pressure_sensor, &hi2c1);
-
-    // Take the average of the initial atmospheric pressure reading
-    surface_pressure_pa = Callibrate_MS5837(&pressure_sensor, SURFACE_PRESSURE_AVERAGE);
-    
-  for (;;)
-  {
-
-      Read_TSYS01(&temp_sensor);
-      Read_MS5837(&pressure_sensor);
-
-      osDelay(200);
-  }
 }
 
 /* USER CODE END Application */

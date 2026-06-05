@@ -1,14 +1,20 @@
 /* 
- * File:   UartProtocol.h
+ * File:   TSYS01TemperatureSensor.c
  * Author: Jose Machon
  *
- * Created on April 1, 2026, 9:24 AM
+ * Created on April 3, 2026, 1:07 PM
+ * 
+ * This library was translated into embedded c and taken from documentation 
+ * from BlueRobotics. Documentation can be found on the 
+ * github: https://github.com/bluerobotics/BlueRobotics_TSYS01_Library
+ *
  */
 
 #include "TelemetryStream.h"
 #include "TSYS01TemperatureSensor.h"
 
 volatile float tempcheck = 0;
+
 static HAL_StatusTypeDef TSYS01_WriteCommand(TSY01_TemperatureSensor_t *Sensor, uint8_t Command)
 {
     return HAL_I2C_Master_Transmit(Sensor->hi2c, Sensor->Address, &Command, 1, 100);
@@ -29,31 +35,18 @@ uint8_t Init_TSYS01(TSY01_TemperatureSensor_t *Sensor, I2C_HandleTypeDef *hi2c)
     Sensor->Address = (TSYS01_ADDR << 1);
 
     status = TSYS01_WriteCommand(Sensor, TSYS01_RESET);
-    if (status != HAL_OK) {
-        printf("TSYS01 reset failed, status=%d\r\n", status);
-        return 0;
-    }
+
 
     HAL_Delay(10);
 
     for (uint8_t i = 0; i < 8; i++) {
+
         status = TSYS01_WriteCommand(Sensor, TSYS01_PROM_READ + (i * 2));
-        if (status != HAL_OK) {
-            printf("TSYS01 PROM cmd failed at %u, status=%d\r\n", i, status);
-            return 0;
-        }
-
         status = TSYS01_ReadBytes(Sensor, buffer, 2);
-        if (status != HAL_OK) {
-            printf("TSYS01 PROM read failed at %u, status=%d\r\n", i, status);
-            return 0;
-        }
-
         Sensor->Coefficients[i] = ((uint16_t)buffer[0] << 8) | buffer[1];
-      //  printf("C[%u] = %u\r\n", i, Sensor->Coefficients[i]);
+
     }
 
-   // printf("TSYS01 init done\r\n");
     return 1;
 }
 
@@ -74,12 +67,15 @@ uint8_t Read_TSYS01(TSY01_TemperatureSensor_t *Sensor){
     Calculate_TSYS01(Sensor);
 
     float temp = tempcheck; 
-    printf("%0.2f\n", temp);
+
+    // ENCOUNTERED SOME NOISE SO THIS CONDITIONAL REJECTS NOISE.
+
     if(temp < -10.0f || temp > 80.0f){
         return 0;
     }
-   Sensor->Temperature_C  = temp ;
-    environmetal_telemetry_packet.temp = (int32_t)(Sensor->Temperature_C ) * 1000.0f ;
+
+   Sensor->Temperature_C  = temp;
+   environmetal_telemetry_packet.temp = (int32_t)(Sensor->Temperature_C ) * 1000.0f ;
 
     return 1;
 
@@ -96,9 +92,7 @@ void Calculate_TSYS01(TSY01_TemperatureSensor_t *Sensor){
                               (-1.5f) * ((float)Sensor -> Coefficients[5]) / 100.0f;
 }
 
-
-
-//I DID NOT MAKE SURE THIS WORKED 
+// Part of the documentation but I DID NOT MAKE SURE THIS WORKED. Instead I validated using reference sensors.
 
 // void readTestCase_TSYS01() {
 // 	C[0] = 0;

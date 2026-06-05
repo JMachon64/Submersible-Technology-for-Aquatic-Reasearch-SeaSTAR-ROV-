@@ -17,6 +17,10 @@
 #include "stm32f3xx_hal_tim.h"
 #include "Uart.h"
 
+/* 
+ * Structs storing relevant data to send via UART packets.
+ */
+
 typedef struct{
 
     int32_t temp;
@@ -36,19 +40,10 @@ typedef struct{
 
 }positional_packet_t;
 
-typedef struct{
-
-    int16_t voltage_mv;
-    int16_t current_ma;
-    int16_t power_mw;
-    uint32_t timestamp_ms;
-
-}power_packet_t;
 /* 
- * 
- * 
- * 
+ * Sampling flags linked to hardware timers.
  */
+
 extern volatile uint32_t packetsendcounter;
 extern volatile uint8_t sample_flag;
 
@@ -66,7 +61,7 @@ extern volatile uint8_t powersampleflag;
 
 extern environmental_packet_t environmetal_telemetry_packet;
 extern positional_packet_t positional_telemetry_packet;
-extern power_packet_t power_telemetry_packet;
+
 
 /* 
  * 
@@ -77,7 +72,5 @@ extern power_packet_t power_telemetry_packet;
 void TelemetryStream_SendEnvironmental(environmental_packet_t *Data);
 
 void TelemetryStream_SendOrientation(positional_packet_t *Data);
-
-void TelemetryStream_SendPowerStatus(power_packet_t *Data);
 
 #endif

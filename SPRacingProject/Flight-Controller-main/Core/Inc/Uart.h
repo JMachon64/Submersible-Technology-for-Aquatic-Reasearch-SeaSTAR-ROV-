@@ -19,7 +19,6 @@
 
 #define DMA_RX_BUF_SIZE 64
 
-
 typedef struct{
     uint8_t buffer[BUFFERSIZE];
     volatile uint16_t head;

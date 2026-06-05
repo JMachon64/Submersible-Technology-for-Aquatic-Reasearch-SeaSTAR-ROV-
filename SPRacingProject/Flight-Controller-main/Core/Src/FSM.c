@@ -1,8 +1,14 @@
 /* 
- * File:   UartProtocol.h
+ * File:   FSM.c
  * Author: Jose Machon
  *
- * Created on April 1, 2026, 9:24 AM
+ * Created on April 20, 2026, 11:35 AM
+ *
+ * This is the Finite State Machine code for the SeaSTAR, it had 5 total states
+ * and is deterministic. This state machine reacts to events both on the STM32 
+ * and ones on the PI. It reacts to the PI through UART for sampling commands 
+ * and PI failure events.
+ *
  */
 
 #include "PacketIDs.h"
@@ -17,7 +23,7 @@
 #include "MS5837PressureSensor.h"
 #include "TSYS01TemperatureSensor.h"
 
-static SeaSTAR_FSM_t starfystate = BOOT_MODE;
+static SeaSTAR_FSM_t starfystate = BOOT_MODE; //start out in BOOT mode.
 
 static volatile SeaSTAR_FSM_Event_t pending_event = FSM_EVENT_NONE;
 
@@ -27,18 +33,27 @@ volatile uint8_t pi_healthy = true;
 extern TSY01_TemperatureSensor_t temp_sensor;
 extern MS5837_PressureSensor_t pressure_sensor;
 
+
+/* 
+ * Event checker that the state machine reacts to.
+ */
+
 void FSM_PostEvent(SeaSTAR_FSM_Event_t event)
 {
-    pending_event = event;
+    pending_event = event; //update event.
 }
 
-static SeaSTAR_FSM_t return_state = MISSION_MODE_IDLE;
+static SeaSTAR_FSM_t return_state = MISSION_MODE_IDLE; //default to IDLE if anything happens.
+
+
+/* 
+ * State machine, 5 states, deterministic behavior.
+ */ 
 
 uint8_t SeaSTAR_FSM(void)
 {
     SeaSTAR_FSM_Event_t event = pending_event;
     pending_event = FSM_EVENT_NONE;
-
 
     switch (starfystate)
     {
@@ -48,9 +63,6 @@ uint8_t SeaSTAR_FSM(void)
             {
 
                 starfystate = MISSION_MODE_IDLE;
-
-                printf("Transition: [BOOT] -> [IDLE]\r\n");
-
                 thrusters_disabled = true;
 
                 break;
@@ -59,7 +71,6 @@ uint8_t SeaSTAR_FSM(void)
             else if (event == FSM_EVENT_LEAK_DETECTED)
             {
                 starfystate = FAILURE_MODE;
-                printf("Transition: [FAILURE] -> [FAILURE]: LEAK DETECTED\r\n");
                 break;
             }
             break;
@@ -72,7 +83,6 @@ uint8_t SeaSTAR_FSM(void)
             {
                 thrusters_disabled = false;
                 starfystate = MISSION_MODE_ACTIVE;
-                printf("Transition: [IDLE] -> [ACTIVE]\r\n");
                 break;
             }
             if (event == FSM_EVENT_COLLECT_WATER_SAMPLE)
@@ -86,7 +96,6 @@ uint8_t SeaSTAR_FSM(void)
             else if (event == FSM_EVENT_LEAK_DETECTED)
             {
                 starfystate = FAILURE_MODE;
-                printf("Transition: [IDLE] -> [FAILURE]: LEAK DETECTED\r\n");
                 break;
             }
             else if (event == FSM_EVENT_PI_FAILURE)
@@ -94,14 +103,12 @@ uint8_t SeaSTAR_FSM(void)
                 pi_healthy = false;
                 heartbeat_enabled = false;
                 starfystate = FAILURE_MODE;
-                printf("Transition: [IDLE] -> [FAILURE]: PI FAILURE\r\n");
                 break;
             }
             else if (event == FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE)
             {
                 comm_failure = true;
                 starfystate = FAILURE_MODE;
-                printf("Transition: [IDLE] -> [FAILURE]: COMMUNICATION\r\n");
                 break;
             }
             break;
@@ -111,14 +118,12 @@ uint8_t SeaSTAR_FSM(void)
             if (event == FSM_EVENT_END_MISSION)
             {
                 starfystate = MISSION_MODE_IDLE;
-                printf("Transition: [ACTIVE] -> [IDLE]\r\n");
                 break;
             }
             if (event == FSM_EVENT_COLLECT_WATER_SAMPLE)
             {
                 thrusters_disabled = true;
-                return_state = MISSION_MODE_ACTIVE;
-
+                return_state = MISSION_MODE_ACTIVE; //store last known state to be able to return.
                 starfystate = COLLECT_WATER_SAMPLE_MODE;
 
                 break;
@@ -126,22 +131,19 @@ uint8_t SeaSTAR_FSM(void)
             else if (event == FSM_EVENT_LEAK_DETECTED)
             {
                 starfystate = FAILURE_MODE;
-                printf("Transition: [ACTIVE] -> [FAILURE]\r\n");
                 break;
             }
             else if (event == FSM_EVENT_PI_FAILURE)
             {
-                pi_healthy = false;
+                pi_healthy = false; 
                 heartbeat_enabled = false;
                 starfystate = FAILURE_MODE;
-                printf("Transition: [ACTIVE] -> [FAILURE]\r\n");
                 break;
             }
             else if (event == FSM_EVENT_COMMUNICATION_CONNECTION_FAILURE)
             {
                 comm_failure = 1;
                 starfystate = FAILURE_MODE;
-                printf("Transition: [ACTIVE] -> [FAILURE]\r\n");
                 break;
             }
             break;
@@ -150,17 +152,15 @@ uint8_t SeaSTAR_FSM(void)
         {
 
             Control_Update_Command(0, 0, 0, 0, 0);
+
              //SHUTOFF ALL THRUSTERS IN THE EVENT OF AN EMERGENCY
 
-            if (comm_failure == 0 && leakLatched == 0 && pi_healthy == 1)
+            if (comm_failure == 0 && leakLatched == 0 && pi_healthy == 1) // Only exit if theres no leak and other criticals come back.
             {
-                heartbeat_enabled = true;
-
+                heartbeat_enabled = true; //start responding to pings again
                 starfystate = MISSION_MODE_IDLE;
-                printf("Transition: [FAILURE] -> [IDLE]: RECONNECTION\r\n");
                 break;
             }
-
             break;
         }
 
@@ -173,14 +173,15 @@ uint8_t SeaSTAR_FSM(void)
 
             Control_Update_Command(0, 0, 0, 0, 0);
 
+            // actuation sequence for the NISKIN bottle.
             HAL_Delay(2000);
-            PWM_SampleClosedPosition();
+            PWM_SampleClosedPosition(); // start 
             HAL_Delay(700);
-            PWM_SampleOpenPosition();
+            PWM_SampleOpenPosition(); //   release mechanism close bottle.
             HAL_Delay(700);
-            PWM_SampleClosedPosition();
+            PWM_SampleClosedPosition(); // reset latch position for re arming.
 
-            // sID_WATER_SAMPLE_COMPLETE SEND TELEMETRY COLLECTED AT THAT SAMPLE
+            // ID_WATER_SAMPLE_COMPLETE SEND TELEMETRY COLLECTED AT THAT SAMPLE
 
             environmetal_telemetry_packet.depth       = (int32_t)(pressure_sensor.Depth_m * 1000.0f);
             environmetal_telemetry_packet.pressure_Pa = (int32_t)(pressure_sensor.Pressure_Pa) + pressure_offset;
@@ -189,14 +190,13 @@ uint8_t SeaSTAR_FSM(void)
                 
             Protocol_SendPacket(sizeof(environmental_packet_t), ID_WATER_SAMPLE_COMPLETE,  &environmetal_telemetry_packet);
             
-            if(return_state == MISSION_MODE_IDLE){
-                thrusters_disabled = true;
-            }
-            else{
-                thrusters_disabled = false;
-            }
+            //Depending on return state keep thrusters disable or re enable movement.
+
+            if(return_state == MISSION_MODE_IDLE){ thrusters_disabled = true;}
+            else{thrusters_disabled = false;}
 
             starfystate = return_state;
+
             break;
 
         }

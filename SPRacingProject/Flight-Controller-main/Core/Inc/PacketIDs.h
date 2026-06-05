@@ -3,6 +3,10 @@
  * Author: Jose Machon
  *
  * Created on April 1, 2026, 9:24 AM
+ *
+ * Contains all the packet identifiers for the UART communication. They are assinged 
+ * arbitrary unique hex codes that are the same on the RaspberryPi 4.
+ *
  */
 
 #ifndef PACKETIDS_H
@@ -31,11 +35,6 @@ typedef enum{
     ID_START_MISSION           = 0x4,
     ID_END_MISSION             = 0x5,
     ID_PI_RECOVERY             = 0x19,
-
-    //MISSION SETTINGS
-    ID_SET_CONTROL_LOOP_GAINS  = 0x18,
-    ID_SET_SAMPLING_RATES      = 0x29,
-    ID_SET_MAXIMUM_SPEED       = 0x39,
     
     ///MISSION COMMANDS
 
@@ -46,11 +45,9 @@ typedef enum{
     //TELEMETRY 
     ID_ENVIRONMENTAL_TELEMETRY = 0x8,
     ID_POSITIONAL_TELEMETRY    = 0x9,
-    ID_POWER_STATUS_TELEMETRY  = 0x69,
 
    //FAILURE DETECTION 
     ID_LEAK_DETECTED           = 0x6,
-    ID_CURRENT_SPIKE_DETECTED  = 0x7,
     ID_PI_FAILURE              = 0x22,
 
 
